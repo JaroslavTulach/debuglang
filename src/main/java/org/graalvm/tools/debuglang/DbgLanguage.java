@@ -61,10 +61,11 @@ public class DbgLanguage extends TruffleLanguage<Data> {
 
     @Override
     protected CallTarget parse(ParsingRequest request) throws Exception {
+        DbgFactory.Program res = new DbgParser(new DbgFactory()).parseString(request.getSource().getCharacters().toString());
 //        final URI at = request.getSource().getURI();
 //        File file = new File(at);
 //        return Truffle.getRuntime().createCallTarget(new HeapRoot(this, file));
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException(""  + res);
     }
 
 

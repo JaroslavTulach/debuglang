@@ -55,9 +55,8 @@ public class DbgLanguageTest {
         final Context ctx = Context.newBuilder().build();
         Value res = ctx.eval("dbg", "at fib.js:4\n"
                 + "  watch n\n"
-                + "at fib.js:8\n"
-                + "  watch a"
-                + "  watch b"
+                + "at fib2.js:8\n"
+                + "  watch a\n"
         );
         Assert.assertEquals(3, res.asInt());
     }
