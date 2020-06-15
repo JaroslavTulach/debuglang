@@ -59,6 +59,11 @@ public class DbgFactory {
         l.addFirst(a);
         return l;
     }
+    List<Watch> action(List<Watch> prev, Watch a) {
+        final LinkedList<Watch> l = new LinkedList<>(prev);
+        l.addFirst(a);
+        return l;
+    }
 
     Watch is(@Name("watch") Keyword watch, String variableName) {
         return new Watch(variableName);
