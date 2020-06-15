@@ -50,10 +50,10 @@ import com.oracle.truffle.api.TruffleLanguage;
     id = "dbg",
     fileTypeDetectors = DbgFileType.class
 )
-public class DbgLanguage extends TruffleLanguage<Data> {
+public class DbgLanguage extends TruffleLanguage<TruffleLanguage.Env> {
     @Override
-    protected Data createContext(Env env) {
-        return new Data();
+    protected Env createContext(Env env) {
+        return env;
     }
 
     @Override
@@ -73,5 +73,3 @@ public class DbgLanguage extends TruffleLanguage<Data> {
     }
 }
 
-class Data {
-}

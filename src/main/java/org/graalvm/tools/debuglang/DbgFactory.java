@@ -1,10 +1,16 @@
 package org.graalvm.tools.debuglang;
 
 import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.TruffleLanguage.Env;
+import com.oracle.truffle.api.dsl.Cached;
+import com.oracle.truffle.api.dsl.CachedContext;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.interop.UnknownIdentifierException;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
+import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.RootNode;
@@ -12,10 +18,15 @@ import foundation.rpg.Match;
 import foundation.rpg.Name;
 import foundation.rpg.StartSymbol;
 import foundation.rpg.parser.Token;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedList;
 
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import static org.graalvm.tools.debuglang.DbgLanguage.raise;
 
 
@@ -98,14 +109,55 @@ public class DbgFactory {
             }
         }
 
+        static String findSrc(Object[] args) {
+            try {
+                InteropLibrary iop = InteropLibrary.getFactory().getUncached();
+                Object src = iop.readMember(args[0], "source");
+                return iop.asString(iop.readMember(src, "name"));
+            } catch (InteropException ex) {
+                throw raise(RuntimeException.class, ex);
+            }
+        }
+
+        static int findLine(Object[] args) {
+            try {
+                InteropLibrary iop = InteropLibrary.getFactory().getUncached();
+                return iop.asInt(iop.readMember(args[0], "line"));
+            } catch (InteropException ex) {
+                throw raise(RuntimeException.class, ex);
+            }
+        }
+
         @ExportMessage
-        Object execute(Object[] args) {
-            Object ctx = args[0];
+        Object execute(Object[] args,
+            @CachedContext(DbgLanguage.class) Env context,
+            @CachedLibrary(limit = "3") InteropLibrary frameLib,
+            @Cached(value = "findSrc(args)", allowUncached = true) String src,
+            @Cached(value = "findLine(args)", allowUncached = true) int line
+        ) {
             Object frame = args[1];
             for (Watch w : actions) {
-                System.err.println("");
+                Object value;
+                try {
+                    value = frameLib.readMember(frame, w.variableName);
+                } catch (InteropException ex) {
+                    continue;
+                }
+                dumpOutLog(context, src, line, w, value);
             }
             return this;
+        }
+
+        @CompilerDirectives.TruffleBoundary
+        private void dumpOutLog(Env context, String src, int line1, Watch w, Object value) {
+            final String msg = String.format("at %s:%d watch %s = %s\n", src, line1, w.variableName, value);
+            try {
+                final OutputStream out = context.out();
+                out.write(msg.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
         }
 
         @ExportMessage
@@ -155,7 +207,7 @@ public class DbgFactory {
     }
 
     public static final class Watch {
-        private final String variableName;
+        final String variableName;
 
         public Watch(String variableName) {
             this.variableName = variableName;
