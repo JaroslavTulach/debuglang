@@ -36,5 +36,16 @@
             <version>${graalvm.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>foundation.fluent.api</groupId>
+            <artifactId>rpg</artifactId>
+            <version>0.9</version>
+        </dependency>
+        <dependency>
+            <groupId>foundation.fluent.api</groupId>
+            <artifactId>rpg-apt</artifactId>
+            <version>0.9</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>
