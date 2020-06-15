@@ -5,6 +5,8 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.library.ExportLibrary;
+import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.RootNode;
 import foundation.rpg.Match;
 import foundation.rpg.Name;
@@ -75,6 +77,7 @@ public class DbgFactory {
         }
     }
 
+    @ExportLibrary(InteropLibrary.class)
     public static final class At implements TruffleObject {
         final String file;
         final int line;
@@ -86,13 +89,48 @@ public class DbgFactory {
             this.actions = actions;
         }
 
-        void register(Object argument) {
+        final void register(Object argument) {
             InteropLibrary iop = InteropLibrary.getFactory().getUncached();
             try {
-                iop.invokeMember(argument, "on", "enter", this);
+                iop.invokeMember(argument, "on", "enter", this, this);
             } catch (InteropException ex) {
                 throw raise(RuntimeException.class, ex);
             }
+        }
+
+        @ExportMessage
+        Object execute(Object[] args) {
+            Object ctx = args[0];
+            Object frame = args[1];
+            for (Watch w : actions) {
+                System.err.println("");
+            }
+            return this;
+        }
+
+        @ExportMessage
+        boolean isExecutable() {
+            return true;
+        }
+
+        @ExportMessage
+        Object readMember(String member) {
+            return "statements".equals(member);
+        }
+
+        @ExportMessage
+        boolean isMemberReadable(String member) {
+            return true;
+        }
+
+        @ExportMessage
+        boolean hasMembers() {
+            return true;
+        }
+
+        @ExportMessage
+        Object getMembers(boolean include) {
+            return this;
         }
     }
 
@@ -106,13 +144,11 @@ public class DbgFactory {
 
     public static final class Keyword {
         Keyword(String k) {
-            System.err.println("    K: " + k);
         }
     }
 
     public static final class WhiteSpace {
         WhiteSpace(String spaces) {
-            System.err.println("whilte " + spaces);
         }
     }
 

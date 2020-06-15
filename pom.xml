@@ -31,6 +31,12 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js</artifactId>
+            <version>${graalvm.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>foundation.fluent.api</groupId>
             <artifactId>rpg</artifactId>
             <version>0.9</version>
