@@ -45,9 +45,10 @@ import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.TruffleLanguage;
 
 @TruffleLanguage.Registration(
-    characterMimeTypes = "application/x-debug",
+    characterMimeTypes = DbgFileType.TYPE,
     name = "Debug Language",
-    id = "dbg"
+    id = "dbg",
+    fileTypeDetectors = DbgFileType.class
 )
 public class DbgLanguage extends TruffleLanguage<Data> {
     @Override

@@ -132,6 +132,26 @@ public class DbgFactory {
         Object getMembers(boolean include) {
             return this;
         }
+
+        @ExportMessage
+        Object readArrayElement(long index) {
+            return "statements";
+        }
+
+        @ExportMessage
+        boolean hasArrayElements() {
+            return true;
+        }
+
+        @ExportMessage
+        long getArraySize() {
+            return 1;
+        }
+
+        @ExportMessage
+        boolean isArrayElementReadable(long index) {
+            return true;
+        }
     }
 
     public static final class Watch {
