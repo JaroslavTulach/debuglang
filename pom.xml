@@ -20,12 +20,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.netbeans.api</groupId>
-            <artifactId>org-netbeans-modules-lexer</artifactId>
-            <version>RELEASE110</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>org.graalvm.truffle</groupId>
             <artifactId>truffle-api</artifactId>
             <version>${graalvm.version}</version>

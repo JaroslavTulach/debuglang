@@ -44,7 +44,7 @@ import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.TruffleLanguage;
 
 @TruffleLanguage.Registration(
-    characterMimeTypes = DbgTokenId.MIMETYPE,
+    characterMimeTypes = "application/x-debug",
     name = "Debug Language",
     id = "dbg"
 )
