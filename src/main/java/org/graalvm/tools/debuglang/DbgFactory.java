@@ -1,5 +1,11 @@
 package org.graalvm.tools.debuglang;
 
+import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.interop.InteropException;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.nodes.RootNode;
 import foundation.rpg.Match;
 import foundation.rpg.Name;
 import foundation.rpg.StartSymbol;
@@ -8,11 +14,18 @@ import java.util.Collections;
 import java.util.LinkedList;
 
 import java.util.List;
+import static org.graalvm.tools.debuglang.DbgLanguage.raise;
 
 
 public class DbgFactory {
+    private final DbgLanguage language;
+
+    DbgFactory(DbgLanguage language) {
+        this.language = language;
+    }
+
     @StartSymbol(parserClassName = "DbgParser")
-    Program is (List<At> s) { return new Program(s); }
+    Program is (List<At> s) { return new Program(language, s); }
     List<At> is() { return Collections.emptyList(); }
     List<At> is(At at, List<At> end) {
         final LinkedList<At> l = new LinkedList<>(end);
@@ -40,19 +53,46 @@ public class DbgFactory {
 
     static void ignore(@Match("\\s+") WhiteSpace w) {}
 
-    public static final class Program {
-        Program(List<At> s) {
+    public static final class Program extends RootNode {
+        private final List<At> statements;
+
+        Program(DbgLanguage language, List<At> statements) {
+            super(language);
+            this.statements = statements;
         }
 
+        @Override
+        public Object execute(VirtualFrame frame) {
+            CompilerDirectives.transferToInterpreter();
+            final Object[] args = frame.getArguments();
+            final Object insight = args.length > 0 ? args[0] : null;
+            if (insight != null) {
+                for (At at : statements) {
+                    at.register(insight);
+                }
+            }
+            return 0;
+        }
     }
 
-    public static final class At {
+    public static final class At implements TruffleObject {
         final String file;
         final int line;
+        final List<Watch> actions;
 
         At(String file, int line, List<Watch> actions) {
             this.file = file;
             this.line = line;
+            this.actions = actions;
+        }
+
+        void register(Object argument) {
+            InteropLibrary iop = InteropLibrary.getFactory().getUncached();
+            try {
+                iop.invokeMember(argument, "on", "enter", this);
+            } catch (InteropException ex) {
+                throw raise(RuntimeException.class, ex);
+            }
         }
     }
 

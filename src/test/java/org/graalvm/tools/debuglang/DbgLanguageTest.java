@@ -58,7 +58,7 @@ public class DbgLanguageTest {
                 + "at fib2.js:8\n"
                 + "  watch a\n"
         );
-        Assert.assertEquals(3, res.asInt());
+        Assert.assertEquals(0, res.asInt());
     }
 
 }
