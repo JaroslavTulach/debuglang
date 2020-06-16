@@ -40,36 +40,14 @@
  */
 package org.graalvm.tools.debuglang;
 
-import com.oracle.truffle.api.CallTarget;
-import com.oracle.truffle.api.Truffle;
-import com.oracle.truffle.api.TruffleLanguage;
+final class DbgAtWatch {
 
-@TruffleLanguage.Registration(
-    characterMimeTypes = DbgFileType.TYPE,
-    name = "Debug Language",
-    id = "dbg",
-    fileTypeDetectors = DbgFileType.class
-)
-public class DbgLanguage extends TruffleLanguage<TruffleLanguage.Env> {
-    @Override
-    protected Env createContext(Env env) {
-        return env;
+    final String variableName;
+    final Integer value;
+
+    public DbgAtWatch(String variableName, Integer value) {
+        this.variableName = variableName;
+        this.value = value;
     }
 
-    @Override
-    protected boolean isObjectOfLanguage(Object object) {
-        return false;
-    }
-
-    @Override
-    protected CallTarget parse(ParsingRequest request) throws Exception {
-        DbgProgramNode res = new DbgParser(new DbgLanguageGrammar(this)).parseString(request.getSource().getCharacters().toString());
-        return Truffle.getRuntime().createCallTarget(res);
-    }
-
-
-    static <E extends Exception> E raise(Class<E> type, Exception ex) throws E {
-        throw (E) ex;
-    }
 }
-

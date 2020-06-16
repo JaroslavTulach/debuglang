@@ -40,36 +40,30 @@
  */
 package org.graalvm.tools.debuglang;
 
-import com.oracle.truffle.api.CallTarget;
-import com.oracle.truffle.api.Truffle;
-import com.oracle.truffle.api.TruffleLanguage;
+import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.nodes.RootNode;
+import java.util.List;
 
-@TruffleLanguage.Registration(
-    characterMimeTypes = DbgFileType.TYPE,
-    name = "Debug Language",
-    id = "dbg",
-    fileTypeDetectors = DbgFileType.class
-)
-public class DbgLanguage extends TruffleLanguage<TruffleLanguage.Env> {
-    @Override
-    protected Env createContext(Env env) {
-        return env;
+final class DbgProgramNode extends RootNode {
+    private final List<DbgAt> statements;
+
+    DbgProgramNode(DbgLanguage language, List<DbgAt> statements) {
+        super(language);
+        this.statements = statements;
     }
 
     @Override
-    protected boolean isObjectOfLanguage(Object object) {
-        return false;
+    public Object execute(VirtualFrame frame) {
+        final Object[] args = frame.getArguments();
+        final Object insight = args.length > 0 ? args[0] : null;
+        if (insight != null) {
+            CompilerDirectives.transferToInterpreter();
+            for (DbgAt at : statements) {
+                at.register(insight);
+            }
+        }
+        return 0;
     }
 
-    @Override
-    protected CallTarget parse(ParsingRequest request) throws Exception {
-        DbgProgramNode res = new DbgParser(new DbgLanguageGrammar(this)).parseString(request.getSource().getCharacters().toString());
-        return Truffle.getRuntime().createCallTarget(res);
-    }
-
-
-    static <E extends Exception> E raise(Class<E> type, Exception ex) throws E {
-        throw (E) ex;
-    }
 }
-
