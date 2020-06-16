@@ -40,64 +40,67 @@
  */
 package org.graalvm.tools.debuglang;
 
-import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.CompilerDirectives;
-import com.oracle.truffle.api.Truffle;
+import com.oracle.truffle.api.debug.DebuggerTags;
+import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
+import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.GenerateWrapper;
+import com.oracle.truffle.api.instrumentation.InstrumentableNode;
+import com.oracle.truffle.api.instrumentation.ProbeNode;
+import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.instrumentation.Tag;
+import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-final class DbgProgramNode extends RootNode {
-    private final DbgLanguage lang;
-    private final List<DbgAt> statements;
-    @CompilerDirectives.CompilationFinal
-    private boolean callTargetsInitialized;
+final class DbgNodeAt extends RootNode {
+    @Child
+    Statement statement;
 
-    DbgProgramNode(DbgLanguage language, List<DbgAt> statements) {
-        super(language);
-        this.lang = language;
-        this.statements = statements;
+    DbgNodeAt(DbgLanguage lang, FrameDescriptor fd, String file, int line) {
+        super(lang, fd);
+        statement = new Statement();
     }
 
     @Override
     public Object execute(VirtualFrame frame) {
-        final Object[] args = frame.getArguments();
-        final Object insight = args.length > 0 ? args[0] : null;
-        if (insight != null) {
-            CompilerDirectives.transferToInterpreter();
-            for (DbgAt at : statements) {
-                at.register(insight);
-            }
-        } else {
-            if (!callTargetsInitialized) {
-                CompilerDirectives.transferToInterpreterAndInvalidate();
-                generateCallTargets();
-                callTargetsInitialized = true;
-            }
-            for (DbgAt at : statements) {
-                at.replay();
-            }
-        }
+        DbgAt at = (DbgAt) frame.getArguments()[0];
+        fillFrame(at, frame);
+        statement.executeStatement(frame);
         return 0;
     }
 
-    private void generateCallTargets() {
-        Map<DbgAt, CallTarget> similar = new HashMap<>();
-        for (DbgAt at : statements) {
-            CallTarget target = similar.get(at);
-            if (target == null) {
-                FrameDescriptor fd = new FrameDescriptor();
-                for (DbgAtWatch w : at.actions) {
-                    fd.addFrameSlot(w.variableName);
-                }
-                DbgNodeAt atNode = new DbgNodeAt(lang, fd, at.file, at.line);
-                target = Truffle.getRuntime().createCallTarget(atNode);
-                similar.put(at, target);
+    @CompilerDirectives.TruffleBoundary
+    private void fillFrame(DbgAt at, Frame frame) {
+        for (DbgAtWatch w : at.actions) {
+            if (w.value != null) {
+                FrameSlot slot = frame.getFrameDescriptor().findFrameSlot(w.variableName);
+                frame.setInt(slot, w.value);
             }
-            at.assignTarget(target);
+        }
+    }
+
+    @GenerateWrapper
+    static class Statement extends Node implements InstrumentableNode {
+        void executeStatement(VirtualFrame frame) {
+        }
+
+        @Override
+        public boolean isInstrumentable() {
+            return true;
+        }
+
+        @Override
+        public WrapperNode createWrapper(ProbeNode probe) {
+            return new StatementWrapper(this, probe);
+        }
+
+        @Override
+        public boolean hasTag(Class<? extends Tag> tag) {
+            return
+                DebuggerTags.AlwaysHalt.class == tag ||
+                StandardTags.StatementTag.class == tag;
         }
     }
 }

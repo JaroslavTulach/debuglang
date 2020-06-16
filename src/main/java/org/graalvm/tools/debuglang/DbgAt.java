@@ -40,6 +40,7 @@
  */
 package org.graalvm.tools.debuglang;
 
+import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.dsl.Cached;
@@ -53,7 +54,10 @@ import com.oracle.truffle.api.library.ExportMessage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @ExportLibrary(value = InteropLibrary.class)
 final class DbgAt implements TruffleObject {
@@ -61,6 +65,8 @@ final class DbgAt implements TruffleObject {
     final String file;
     final int line;
     final List<DbgAtWatch> actions;
+    @CompilerDirectives.CompilationFinal
+    private CallTarget target;
 
     DbgAt(String file, int line, List<DbgAtWatch> actions) {
         this.file = file;
@@ -75,6 +81,40 @@ final class DbgAt implements TruffleObject {
         } catch (InteropException ex) {
             throw DbgLanguage.raise(RuntimeException.class, ex);
         }
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 67 * hash + Objects.hashCode(this.file);
+        hash = 67 * hash + this.line;
+        for (DbgAtWatch w : this.actions) {
+            hash = 67 * hash + w.variableName.hashCode();
+        }
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final DbgAt other = (DbgAt) obj;
+        return variableNames(this.actions).equals(variableNames(other.actions));
+    }
+
+    static Set<String> variableNames(List<DbgAtWatch> all) {
+        Set<String> set = new HashSet<>();
+        for (DbgAtWatch w : all) {
+            set.add(w.variableName);
+        }
+        return set;
     }
 
     static String findSrc(Object[] args) {
@@ -168,4 +208,11 @@ final class DbgAt implements TruffleObject {
         return true;
     }
 
+    void assignTarget(CallTarget target) {
+        this.target = target;
+    }
+
+    void replay() {
+        target.call(this);
+    }
 }
