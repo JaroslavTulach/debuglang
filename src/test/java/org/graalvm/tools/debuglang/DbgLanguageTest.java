@@ -61,4 +61,15 @@ public class DbgLanguageTest {
         Assert.assertEquals(0, res.asInt());
     }
 
+    @Test
+    public void parseMoreWatcheOver() {
+        final Context ctx = Context.newBuilder().build();
+        Value res = ctx.eval("dbg", ""
+                + "at fib2.js:8\n"
+                + "  watch a\n"
+                + "  watch b\n"
+        );
+        Assert.assertEquals(0, res.asInt());
+    }
+
 }

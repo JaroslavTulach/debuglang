@@ -8,8 +8,6 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
-import com.oracle.truffle.api.interop.UnknownIdentifierException;
-import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
@@ -25,8 +23,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import static org.graalvm.tools.debuglang.DbgLanguage.raise;
 
 
@@ -45,7 +41,7 @@ public class DbgFactory {
         l.addFirst(at);
         return l;
     }
-    At is(@Name("at") Keyword at, String file, Colon c, Integer line, List<Watch> actions) {
+    At is(@Name("at") KeywordAt at, String file, Colon c, Integer line, List<Watch> actions) {
         return new At(file, line.intValue(), actions);
     }
     Integer integer(@Match("\\d+") Token t) {
@@ -59,8 +55,13 @@ public class DbgFactory {
         l.addFirst(a);
         return l;
     }
+    List<Watch> action(List<Watch> prev, Watch a) {
+        final LinkedList<Watch> l = new LinkedList<>(prev);
+        l.addFirst(a);
+        return l;
+    }
 
-    Watch is(@Name("watch") Keyword watch, String variableName) {
+    Watch is(@Name("watch") KeywordWatch watch, String variableName) {
         return new Watch(variableName);
     }
 
@@ -214,8 +215,13 @@ public class DbgFactory {
         }
     }
 
-    public static final class Keyword {
-        Keyword(String k) {
+    public static final class KeywordAt {
+        KeywordAt(String k) {
+        }
+    }
+
+    public static final class KeywordWatch {
+        KeywordWatch(String k) {
         }
     }
 
