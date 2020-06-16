@@ -61,8 +61,12 @@ public class DbgFactory {
         return l;
     }
 
+    Watch is(@Name("watch") KeywordWatch watch, String variableName, Equals equals, Integer value) {
+        return new Watch(variableName, value);
+    }
+
     Watch is(@Name("watch") KeywordWatch watch, String variableName) {
-        return new Watch(variableName);
+        return new Watch(variableName, null);
     }
 
     static void ignore(@Match("\\s+") WhiteSpace w) {}
@@ -209,9 +213,11 @@ public class DbgFactory {
 
     public static final class Watch {
         final String variableName;
+        final Integer value;
 
-        public Watch(String variableName) {
+        public Watch(String variableName, Integer value) {
             this.variableName = variableName;
+            this.value = value;
         }
     }
 
@@ -233,6 +239,12 @@ public class DbgFactory {
     @Name(":")
     public static final class Colon {
         public Colon(String text) {
+        }
+    }
+
+    @Name("=")
+    public static final class Equals {
+        public Equals(String text) {
         }
     }
 }
