@@ -40,7 +40,10 @@
  */
 package org.graalvm.tools.debuglang;
 
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.TruffleFile;
+import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.debug.DebuggerTags;
 import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
@@ -53,14 +56,41 @@ import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
+import com.oracle.truffle.api.source.Source;
+import com.oracle.truffle.api.source.SourceSection;
+import java.io.IOException;
 
 final class DbgNodeAt extends RootNode {
     @Child
     Statement statement;
+    private final String file;
+    private final int line;
 
     DbgNodeAt(DbgLanguage lang, FrameDescriptor fd, String file, int line) {
         super(lang, fd);
         statement = new Statement();
+        this.file = file;
+        this.line = line;
+    }
+
+    @Override
+    public SourceSection getSourceSection() {
+        CompilerAsserts.neverPartOfCompilation();
+        TruffleLanguage.Env env = lookupContextReference(DbgLanguage.class).get();
+        TruffleFile truffleFile = env.getPublicTruffleFile(file);
+        Source src = null;
+        String msg = "";
+        try {
+            if (truffleFile != null) {
+                src = Source.newBuilder("dbg", truffleFile).build();
+            }
+        } catch (SecurityException | IOException ex) {
+            msg = ex.getMessage();
+        }
+        if (src == null) {
+            return Source.newBuilder("dbg", msg, file).build().createSection(1);
+        }
+        return src.createSection(line);
     }
 
     @Override
@@ -83,6 +113,11 @@ final class DbgNodeAt extends RootNode {
 
     @GenerateWrapper
     static class Statement extends Node implements InstrumentableNode {
+        @Override
+        public SourceSection getSourceSection() {
+            return getRootNode().getSourceSection();
+        }
+
         void executeStatement(VirtualFrame frame) {
         }
 

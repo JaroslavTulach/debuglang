@@ -43,6 +43,9 @@ package org.graalvm.tools.debuglang;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.TruffleLanguage;
+import com.oracle.truffle.api.debug.DebuggerTags;
+import com.oracle.truffle.api.instrumentation.ProvidedTags;
+import com.oracle.truffle.api.instrumentation.StandardTags;
 
 @TruffleLanguage.Registration(
     characterMimeTypes = DbgFileType.TYPE,
@@ -50,6 +53,7 @@ import com.oracle.truffle.api.TruffleLanguage;
     id = "dbg",
     fileTypeDetectors = DbgFileType.class
 )
+@ProvidedTags({StandardTags.StatementTag.class, DebuggerTags.class})
 public class DbgLanguage extends TruffleLanguage<TruffleLanguage.Env> {
     @Override
     protected Env createContext(Env env) {
