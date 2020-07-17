@@ -55,7 +55,7 @@ import org.netbeans.lib.profiler.heap.HeapFactory;
 import org.netbeans.lib.profiler.heap.JavaClass;
 
 public class DumpHprofTest {
-    static final String magic3 = "JAVA PROFILE 1.0.3"; // NOI18N
+    static final String MAGIC_WITH_SEGMENTS = "JAVA PROFILE 1.0.2"; // NOI18N
 
     @Test
     public void singleObject() throws IOException {
@@ -120,7 +120,7 @@ public class DumpHprofTest {
 
     private static void generateSingleObject(OutputStream os) throws IOException {
         DataOutputStream dos = new DataOutputStream(os);
-        dos.write(magic3.getBytes());
+        dos.write(MAGIC_WITH_SEGMENTS.getBytes());
         dos.write(0);
         dos.writeInt(4);
         dos.writeLong(System.currentTimeMillis());
