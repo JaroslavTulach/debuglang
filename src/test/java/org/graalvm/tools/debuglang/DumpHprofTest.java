@@ -47,9 +47,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.List;
 import static org.junit.Assert.assertEquals;
 import org.junit.Test;
+import org.netbeans.lib.profiler.heap.GCRoot;
 import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.HeapFactory;
 import org.netbeans.lib.profiler.heap.JavaClass;
@@ -65,6 +67,9 @@ public class DumpHprofTest {
         List<JavaClass> allClasses = heap.getAllClasses();
         assertEquals(1, allClasses.size());
         assertEquals("text.HelloWorld", allClasses.get(0).getName());
+
+        Collection<GCRoot> roots = heap.getGCRoots();
+        assertEquals(1, roots.size());
     }
 
     private static int stringCounter = 0;
@@ -76,6 +81,21 @@ public class DumpHprofTest {
         os.writeInt(stringCounter);
         os.write(utf8);
         return stringCounter++;
+    }
+
+    private static void writeThreadStarted(int id, String threadName, String groupName, DataOutputStream os) throws IOException {
+        int threadNameId = writeString(threadName, os);
+        int groupNameId = writeString(groupName, os);
+
+        os.writeByte(0x0A);
+        os.writeInt(0); // ms
+        os.writeInt(6 * 4);
+        os.writeInt(id); // serial number
+        os.writeInt(id); // object id
+        os.writeInt(0); // stacktrace serial number
+        os.writeInt(threadNameId);
+        os.writeInt(groupNameId);
+        os.writeInt(0); // parent group
     }
 
     private static void writeStackFrame(int id, String rootName, String sourceFile, int lineNumber, DataOutputStream os) throws IOException {
@@ -126,6 +146,7 @@ public class DumpHprofTest {
         dos.writeLong(System.currentTimeMillis());
         int emptyStringId = writeString("", dos);
         assert emptyStringId == 0;
+        writeThreadStarted(77, "main", "test", dos);
         writeStackTrace(22, "HelloWorld", "HelloWorld.js", 11, dos);
         writeLoadClass(55, 22, "text.HelloWorld", dos);
         sampleDumpMemory(dos);
@@ -137,6 +158,8 @@ public class DumpHprofTest {
         DataOutputStream dos = new DataOutputStream(os);
         generateClassDump(55, dos);
         generateInstanceDump(99, 55, dos);
+        generateInstanceDump(77, 55, dos);
+        genereateThreadDump(77, dos);
         dos.close();
 
         whole.writeByte(0x1c);
@@ -172,4 +195,13 @@ public class DumpHprofTest {
         os.writeInt(classId);
         os.writeInt(0); // no fields
     }
+
+    private static void genereateThreadDump(int id, DataOutputStream os) throws IOException {
+        os.writeByte(0x08);
+        os.writeInt(id); // object ID
+        os.writeInt(id); // serial #
+        os.writeInt(0); // stacktrace #
+    }
+
+
 }
