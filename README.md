@@ -1,5 +1,7 @@
 # Post-Mortem Debugging with GraalVM
 
+![Java CI with Maven](https://github.com/JaroslavTulach/debuglang/workflows/Java%20CI%20with%20Maven/badge.svg)
+
 Demonstrating the tooling and polyglot capabilities of [GraalVM](http://graalvm.org).
 Showing how to apply Insights over Ruby and JavaScript programs. 
 Demonstrating usage of a dedicated "debug" language to specify
