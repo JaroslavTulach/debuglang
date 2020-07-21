@@ -26,7 +26,7 @@ at some.js:8 watch y watch z
 $ $GRAALVM/bin/js --jvm --polyglot --insight=watchpoints.dbg some.js
 ```
 
-You can copy the traces into a dedicated file `log.dbg` and reply them in Chrome DevTools:
+You can copy the traces into a dedicated file `log.dbg` and replay them in Chrome DevTools:
 
 ```bash
 $ GRAALVM/bin/polyglot --inspect --jvm log.dbg

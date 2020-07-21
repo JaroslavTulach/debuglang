@@ -10,7 +10,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <graalvm.version>19.3.1</graalvm.version>
+        <graalvm.version>20.1.0</graalvm.version>
     </properties>
     <build>
         <plugins>
@@ -66,6 +66,20 @@
             <artifactId>rpg-apt</artifactId>
             <version>0.9</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.netbeans.modules</groupId>
+            <artifactId>org-netbeans-lib-profiler</artifactId>
+            <version>RELEASE120-1</version>
+            <scope>test</scope>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.tools</groupId>
+            <artifactId>agentscript</artifactId>
+            <version>${graalvm.version}</version>
+            <scope>test</scope>
+            <type>jar</type>
         </dependency>
     </dependencies>
 </project>
