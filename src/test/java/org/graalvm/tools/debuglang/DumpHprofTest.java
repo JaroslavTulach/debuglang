@@ -101,7 +101,7 @@ public class DumpHprofTest {
         return stringCounter++;
     }
 
-    private static void writeThreadStarted(int id, String threadName, String groupName, DataOutputStream os) throws IOException {
+    private static void writeThreadStarted(int id, String threadName, String groupName, int stackTraceId, DataOutputStream os) throws IOException {
         int threadNameId = writeString(threadName, os);
         int groupNameId = writeString(groupName, os);
 
@@ -110,7 +110,7 @@ public class DumpHprofTest {
         os.writeInt(6 * 4);
         os.writeInt(id); // serial number
         os.writeInt(id); // object id
-        os.writeInt(0); // stacktrace serial number
+        os.writeInt(stackTraceId); // stacktrace serial number
         os.writeInt(threadNameId);
         os.writeInt(groupNameId);
         os.writeInt(0); // parent group
@@ -164,7 +164,7 @@ public class DumpHprofTest {
         dos.writeLong(System.currentTimeMillis());
         int emptyStringId = writeString("", dos);
         assert emptyStringId == 0;
-        writeThreadStarted(77, "main", "test", dos);
+        writeThreadStarted(77, "main", "test", 22, dos);
         writeStackTrace(22, "HelloWorld", "HelloWorld.js", 11, dos);
         writeLoadClass(1, 22, "java.lang.String", dos);
         writeLoadClass(2, 22, "char[]", dos);
@@ -193,7 +193,7 @@ public class DumpHprofTest {
             .dumpClass(whole, heap)
             .dumpInstance(99, Collections.emptyMap(), heap)
             .dumpInstance(77, map("daemon", 0, "name", mainId), heap);
-        genereateThreadDump(77, heap);
+        genereateThreadDump(77, 22, heap);
         heap.close();
 
         whole.writeByte(0x1c);
@@ -303,11 +303,11 @@ public class DumpHprofTest {
         return map;
     }
 
-    private static void genereateThreadDump(int id, DataOutputStream os) throws IOException {
+    private static void genereateThreadDump(int id, int stackTraceId, DataOutputStream os) throws IOException {
         os.writeByte(0x08);
         os.writeInt(id); // object ID
         os.writeInt(id); // serial #
-        os.writeInt(0); // stacktrace #
+        os.writeInt(stackTraceId); // stacktrace #
     }
 
 
