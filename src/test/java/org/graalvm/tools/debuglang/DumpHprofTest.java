@@ -68,13 +68,13 @@ public class DumpHprofTest {
         generateSingleObject(new FileOutputStream(mydump));
         Heap heap = HeapFactory.createHeap(mydump);
         List<JavaClass> allClasses = heap.getAllClasses();
-        assertEquals(3, allClasses.size());
+        assertEquals(4, allClasses.size());
         assertEquals("java.lang.String", allClasses.get(0).getName());
         assertEquals("char[]", allClasses.get(1).getName());
         assertEquals("text.HelloWorld", allClasses.get(2).getName());
 
         Collection<GCRoot> roots = new ArrayList<>(heap.getGCRoots());
-        assertEquals("Thread & two locals", 3, roots.size());
+        assertEquals("Thread & two locals", 4, roots.size());
         roots.removeIf((t) -> {
             return ! (t instanceof ThreadObjectGCRoot);
         });
@@ -94,50 +94,24 @@ public class DumpHprofTest {
 
     private static void generateSingleObject(OutputStream os) throws IOException {
         HprofGenerator gen = new HprofGenerator(os);
-        gen.writeThreadStarted(77, "main", "test", 22);
-        gen.writeStackTrace(22, "HelloWorld", "HelloWorld.js", 11);
-        sampleDumpMemory(gen);
+        gen.writeHeapSegment(DumpHprofTest::sampleDumpMemory);
         gen.close();
     }
 
-    private static void sampleDumpMemory(HprofGenerator whole) throws IOException {
-        whole.writeHeapSegment((seg) -> {
-            int mainId = seg.dumpString("main");
-            
-            HprofGenerator.ClassInstance clazz = seg.newClass("text.HelloWorld")
-                    .addField("daemon", Boolean.TYPE)
-                    .addField("name", String.class)
-                    .addField("priority", int.class)
-                    .dumpClass();
-            
-            int threadOne = seg.dumpInstance(clazz);
-            int threadTwo = seg.dumpInstance(clazz, "daemon", 0, "name", mainId, "priority", 10);
-            generateThreadDump(threadTwo, 22, seg.heap, mainId, threadOne);
-        });
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        DataOutputStream heap = new DataOutputStream(os);
+    private static void sampleDumpMemory(HprofGenerator.HeapSegment seg) throws IOException {
+        int mainId = seg.dumpString("main");
 
+        HprofGenerator.ClassInstance clazz = seg.newClass("text.HelloWorld")
+                .addField("daemon", Boolean.TYPE)
+                .addField("name", String.class)
+                .addField("priority", int.class)
+                .dumpClass();
 
-        heap.close();
+        int threadOne = seg.dumpInstance(clazz);
+        int threadTwo = seg.dumpInstance(clazz, "daemon", 0, "name", mainId, "priority", 10);
 
-        whole.whole.writeByte(0x2C);
-        whole.whole.writeInt(0); // ms
-        whole.whole.writeInt(0); // end of message
+        seg.newThread("main")
+                .addStackFrame("HelloWorld", "HelloWorld.js", 11, mainId, threadOne, threadTwo)
+                .dumpThread();
     }
-
-    private static void generateThreadDump(int id, int stackTraceId, DataOutputStream os, int... locals) throws IOException {
-        os.writeByte(0x08);
-        os.writeInt(id); // object ID
-        os.writeInt(id); // serial #
-        os.writeInt(stackTraceId); // stacktrace #
-        
-        for (int objId : locals) {
-            os.writeByte(0x03); // frame GC root
-            os.writeInt(objId);
-            os.writeInt(id); // thread serial #
-            os.writeInt(0); // frame number
-        }
-    }
-
-
 }

@@ -46,18 +46,22 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 final class HprofGenerator implements Closeable {
     private static final String MAGIC_WITH_SEGMENTS = "JAVA PROFILE 1.0.2";
 
-    private final Map<String,Integer> strings = new HashMap<>();
+    private final Map<String,Integer> wholeStrings = new HashMap<>();
+    private final Map<String,Integer> heapStrings = new HashMap<>();
     final DataOutputStream whole;
     private int objectCounter;
     private ClassInstance typeCharArray;
     private ClassInstance typeString;
+    private ClassInstance typeThread;
 
     HprofGenerator(OutputStream os) throws IOException {
         this.whole = new DataOutputStream(os);
@@ -80,6 +84,11 @@ final class HprofGenerator implements Closeable {
             return new ClassBuilder(classId, name);
         }
 
+        public ThreadBuilder newThread(String name) throws IOException {
+            int classId = ++objectCounter;
+            return new ThreadBuilder(classId, name);
+        }
+
         private void close() throws IOException {
             whole.writeByte(0x1c);
             whole.writeInt(0); // ms
@@ -89,6 +98,14 @@ final class HprofGenerator implements Closeable {
         }
 
         public int dumpString(String text) throws IOException {
+            if (text == null) {
+                return 0;
+            }
+            Integer id = heapStrings.get(text);
+            if (id != null) {
+                return id;
+            }
+            
             int instanceId = ++objectCounter;
 
             heap.writeByte(0x23);
@@ -99,7 +116,10 @@ final class HprofGenerator implements Closeable {
             for (char ch : text.toCharArray()) {
                 heap.writeChar(ch);
             }
-            return dumpInstance(typeString, "value", instanceId, "hash", 0);
+            int stringId = dumpInstance(typeString, "value", instanceId, "hash", 0);
+            
+            heapStrings.put(text, stringId);
+            return stringId;
         }
 
         public int dumpInstance(ClassInstance clazz, Object... stringIntSequence) throws IOException {
@@ -123,6 +143,68 @@ final class HprofGenerator implements Closeable {
                 }
             }
             return instanceId;
+        }
+
+        public final class ThreadBuilder {
+            private String groupName;
+            private List<Object[]> stacks;
+            private final String name;
+            private final int classId;
+
+            private ThreadBuilder(int classId, String name) {
+                this.stacks = new ArrayList<>();
+                this.classId = classId;
+                this.name = name;
+            }
+
+            public ThreadBuilder group(String name) {
+                this.groupName = name;
+                return this;
+            }
+
+            public ThreadBuilder addStackFrame(String rootName, String sourceFile, int lineNumber, int... locals) {
+                stacks.add(new Object[]{rootName, sourceFile, lineNumber, locals});
+                return this;
+            }
+
+            public int dumpThread() throws IOException {
+                if (typeThread == null) {
+                    typeThread = newClass("java.lang.Thread")
+                            .addField("daemon", Boolean.TYPE)
+                            .addField("name", String.class)
+                            .addField("priority", int.class)
+                            .dumpClass();
+                }
+                int nameId = dumpString(name);
+                int threadId = dumpInstance(typeThread, "daemon", 0, "name", nameId, "priority", 0);
+                
+                int[] frameIds = new int[stacks.size()];
+                int cnt = 0;
+                for (Object[] frame : stacks) {
+                    frameIds[cnt++] = writeStackFrame((String) frame[0], (String) frame[1], (Integer) frame[2]);
+                }
+                int stackTraceId = writeStackTrace(threadId, frameIds);
+                writeThreadStarted(threadId, name, groupName, stackTraceId);
+                
+                heap.writeByte(0x08);
+                heap.writeInt(threadId); // object ID
+                heap.writeInt(threadId); // serial #
+                heap.writeInt(stackTraceId); // stacktrace #
+
+                cnt = 0;
+                for (Object[] frame : stacks) {
+                    int[] locals = (int[]) frame[3];
+                    for (int objId : locals) {
+                        heap.writeByte(0x03); // frame GC root
+                        heap.writeInt(objId);
+                        heap.writeInt(threadId); // thread serial #
+                        heap.writeInt(cnt); // frame number
+                    }
+                    cnt++;
+                }
+                
+                return threadId;
+            }
         }
         
         public final class ClassBuilder {
@@ -206,7 +288,14 @@ final class HprofGenerator implements Closeable {
         seg.close();
     }
     
-    public void writeThreadStarted(int id, String threadName, String groupName, int stackTraceId) throws IOException {
+    @Override
+    public void close() throws IOException {
+        whole.close();
+    }
+
+    // internal primitives
+
+    private void writeThreadStarted(int id, String threadName, String groupName, int stackTraceId) throws IOException {
         int threadNameId = writeString(threadName);
         int groupNameId = writeString(groupName);
 
@@ -221,7 +310,9 @@ final class HprofGenerator implements Closeable {
         whole.writeInt(0); // parent group
     }
 
-    public void writeStackFrame(int id, String rootName, String sourceFile, int lineNumber) throws IOException {
+    private int writeStackFrame(String rootName, String sourceFile, int lineNumber) throws IOException {
+        int id = ++objectCounter;
+        
         int rootNameId = writeString(rootName);
         int signatureId = 0;
         int sourceFileId = writeString(sourceFile);
@@ -235,26 +326,25 @@ final class HprofGenerator implements Closeable {
         whole.writeInt(sourceFileId);
         whole.writeInt(0);
         whole.writeInt(lineNumber);
+        
+        return id;
     }
 
-    public void writeStackTrace(int id, String rootName, String sourceFile, int lineNumber) throws IOException {
-        writeStackFrame(id, rootName, sourceFile, lineNumber);
-
+    private int writeStackTrace(int threadId, int... frames) throws IOException {
+        int id = ++objectCounter;
+        
         whole.writeByte(0x05);
         whole.writeInt(0); // ms
         whole.writeInt(4 * 4);
         whole.writeInt(id);
-        whole.writeInt(id);
-        whole.writeInt(1);
-        whole.writeInt(id);
+        whole.writeInt(threadId);
+        whole.writeInt(frames.length);
+        for (int fId : frames) {
+            whole.writeInt(fId);
+        }
+        
+        return id;
     }
-
-    @Override
-    public void close() throws IOException {
-        whole.close();
-    }
-
-    // internal primitives
     
     private int writeLoadClass(int stackTrace, String className) throws IOException {
         int classId = ++objectCounter;
@@ -272,7 +362,10 @@ final class HprofGenerator implements Closeable {
     }
 
     private int writeString(String text) throws IOException {
-        Integer prevId = strings.get(text);
+        if (text == null) {
+            return 0;
+        }
+        Integer prevId = wholeStrings.get(text);
         if (prevId != null) {
             return prevId;
         }
@@ -284,7 +377,7 @@ final class HprofGenerator implements Closeable {
         whole.writeInt(stringId);
         whole.write(utf8);
         
-        strings.put(text, stringId);
+        wholeStrings.put(text, stringId);
         return stringId;
     }
 }
