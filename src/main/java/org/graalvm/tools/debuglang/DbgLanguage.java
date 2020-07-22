@@ -46,6 +46,7 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.debug.DebuggerTags;
 import com.oracle.truffle.api.instrumentation.ProvidedTags;
 import com.oracle.truffle.api.instrumentation.StandardTags;
+import java.io.IOException;
 
 @TruffleLanguage.Registration(
     characterMimeTypes = DbgFileType.TYPE,
@@ -56,10 +57,18 @@ import com.oracle.truffle.api.instrumentation.StandardTags;
 @ProvidedTags({StandardTags.StatementTag.class, DebuggerTags.class})
 public class DbgLanguage extends TruffleLanguage<DbgLanguage.Data> {
     static final class Data {
+        private HprofDump dump;
         final Env env;
 
         Data(Env env) {
             this.env = env;
+        }
+
+        HprofDump getHprof() throws IOException {
+            if (dump == null) {
+                dump = new HprofDump(env.out());
+            }
+            return dump;
         }
     }
     

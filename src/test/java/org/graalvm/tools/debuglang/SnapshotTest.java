@@ -89,5 +89,7 @@ public class SnapshotTest {
         try (FileOutputStream fos = new FileOutputStream(hprof)) {
             fos.write(os.toByteArray());
         }
+        Heap heap = HeapFactory.createHeap(hprof);
+        assertNotNull("Heap loaded", heap);
     }
 }

@@ -58,8 +58,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 @ExportLibrary(value = InteropLibrary.class)
 final class DbgAt implements TruffleObject {
@@ -138,8 +136,24 @@ final class DbgAt implements TruffleObject {
         }
     }
 
+    static String findRootName(Object[] args) {
+        try {
+            InteropLibrary iop = InteropLibrary.getFactory().getUncached();
+            return iop.asString(iop.readMember(args[0], "name"));
+        } catch (InteropException ex) {
+            throw DbgLanguage.raise(RuntimeException.class, ex);
+        }
+    }
+
     @ExportMessage
-    Object execute(Object[] args, @CachedContext(value = DbgLanguage.class) DbgLanguage.Data context, @CachedLibrary(limit = "3") InteropLibrary frameLib, @Cached(value = "findSrc(args)", allowUncached = true) String src, @Cached(value = "findLine(args)", allowUncached = true) int line) {
+    Object execute(
+        Object[] args, 
+        @CachedContext(value = DbgLanguage.class) DbgLanguage.Data context,
+        @CachedLibrary(limit = "3") InteropLibrary frameLib,
+        @Cached(value = "findRootName(args)", allowUncached = true) String rootName, 
+        @Cached(value = "findSrc(args)", allowUncached = true) String src, 
+        @Cached(value = "findLine(args)", allowUncached = true) int line
+    ) {
         if (this.line != line) {
             return this;
         }
@@ -147,6 +161,11 @@ final class DbgAt implements TruffleObject {
         boolean first = true;
         for (DbgAtWatch w : actions) {
             if (w.variableName == null) {
+                try {
+                    context.getHprof().dumpFrame(rootName, src, line, frame);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
                 continue;
             }
             Object value;
