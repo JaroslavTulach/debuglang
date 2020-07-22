@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * The Universal Permissive License (UPL), Version 1.0
@@ -40,48 +40,54 @@
  */
 package org.graalvm.tools.debuglang;
 
-import com.oracle.truffle.api.CallTarget;
-import com.oracle.truffle.api.Truffle;
-import com.oracle.truffle.api.TruffleLanguage;
-import com.oracle.truffle.api.debug.DebuggerTags;
-import com.oracle.truffle.api.instrumentation.ProvidedTags;
-import com.oracle.truffle.api.instrumentation.StandardTags;
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.function.Function;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Instrument;
+import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.Value;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import org.junit.Test;
+import org.netbeans.lib.profiler.heap.Heap;
+import org.netbeans.lib.profiler.heap.HeapFactory;
 
-@TruffleLanguage.Registration(
-    characterMimeTypes = DbgFileType.TYPE,
-    name = "Debug Language",
-    id = "dbg",
-    fileTypeDetectors = DbgFileType.class
-)
-@ProvidedTags({StandardTags.StatementTag.class, DebuggerTags.class})
-public class DbgLanguage extends TruffleLanguage<DbgLanguage.Data> {
-    static final class Data {
-        final Env env;
+public class SnapshotTest {
+    @Test
+    public void processFib() throws Exception {
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        Context c = Context.newBuilder().allowAllAccess(true).out(os).err(os).build();
+        Source fibSource = Source.newBuilder("js",
+                "(function fib(n) {\n"
+                + "  if (n < 2) return 1;\n"
+                + "  let n1 = { value : fib(n - 1) };\n"
+                + "  let n2 = { value : fib(n - 2) };\n"
+                + "  return n1.value + n2.value;\n"
+                + "})\n",
+                "fib.js"
+        ).buildLiteral();
 
-        Data(Env env) {
-            this.env = env;
+        Value fib = c.eval(fibSource);
+        final Instrument insightInstrument = c.getEngine().getInstruments().get("insight");
+        assertNotNull("insight instrument found", insightInstrument);
+        Function<Source,Closeable> insight = insightInstrument.lookup(Function.class);
+
+        Source debugSource = Source.newBuilder("dbg",
+            "at fib.js:5 snapshot", "debug.dbg"
+        ).buildLiteral();
+
+        insight.apply(debugSource);
+
+        Value twentyOne = fib.execute(7);
+
+        assertEquals(21, twentyOne.asInt());
+
+        File hprof = File.createTempFile("mysnaps", ".hprof");
+        try (FileOutputStream fos = new FileOutputStream(hprof)) {
+            fos.write(os.toByteArray());
         }
     }
-    
-    @Override
-    protected Data createContext(Env env) {
-        return new Data(env);
-    }
-
-    @Override
-    protected boolean isObjectOfLanguage(Object object) {
-        return false;
-    }
-
-    @Override
-    protected CallTarget parse(ParsingRequest request) throws Exception {
-        DbgProgramNode res = new DbgParser(new DbgLanguageGrammar(this)).parseString(request.getSource().getCharacters().toString());
-        return Truffle.getRuntime().createCallTarget(res);
-    }
-
-
-    static <E extends Exception> E raise(Class<E> type, Exception ex) throws E {
-        throw (E) ex;
-    }
 }
-

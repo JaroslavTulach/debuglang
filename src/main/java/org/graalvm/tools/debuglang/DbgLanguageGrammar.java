@@ -84,6 +84,12 @@ final class DbgLanguageGrammar {
         return l;
     }
 
+    List<DbgAtWatch> snapshot(@Name("snapshot") KeywordSnapshot snapshot) {
+        final LinkedList<DbgAtWatch> l = new LinkedList<>();
+        l.addFirst(new DbgAtWatch(null, null));
+        return l;
+    }
+
     DbgAtWatch is(@Name("watch") KeywordWatch watch, String variableName, Equals equals, Integer value) {
         return new DbgAtWatch(variableName, value);
     }
@@ -100,6 +106,10 @@ final class DbgLanguageGrammar {
 
     static final class KeywordWatch {
         KeywordWatch(String k) {}
+    }
+
+    static final class KeywordSnapshot {
+        KeywordSnapshot(String k) {}
     }
 
     static final class WhiteSpace {

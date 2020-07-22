@@ -58,6 +58,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 @ExportLibrary(value = InteropLibrary.class)
 final class DbgAt implements TruffleObject {
@@ -89,7 +91,7 @@ final class DbgAt implements TruffleObject {
         hash = 67 * hash + Objects.hashCode(this.file);
         hash = 67 * hash + this.line;
         for (DbgAtWatch w : this.actions) {
-            hash = 67 * hash + w.variableName.hashCode();
+            hash = 67 * hash + Objects.hashCode(w.variableName);
         }
         return hash;
     }
@@ -137,13 +139,16 @@ final class DbgAt implements TruffleObject {
     }
 
     @ExportMessage
-    Object execute(Object[] args, @CachedContext(value = DbgLanguage.class) TruffleLanguage.Env context, @CachedLibrary(limit = "3") InteropLibrary frameLib, @Cached(value = "findSrc(args)", allowUncached = true) String src, @Cached(value = "findLine(args)", allowUncached = true) int line) {
+    Object execute(Object[] args, @CachedContext(value = DbgLanguage.class) DbgLanguage.Data context, @CachedLibrary(limit = "3") InteropLibrary frameLib, @Cached(value = "findSrc(args)", allowUncached = true) String src, @Cached(value = "findLine(args)", allowUncached = true) int line) {
         if (this.line != line) {
             return this;
         }
         Object frame = args[1];
         boolean first = true;
         for (DbgAtWatch w : actions) {
+            if (w.variableName == null) {
+                continue;
+            }
             Object value;
             try {
                 value = frameLib.readMember(frame, w.variableName);
@@ -151,10 +156,10 @@ final class DbgAt implements TruffleObject {
                 continue;
             }
             if (first) {
-                dumpPrologue(context, src, line);
+                dumpPrologue(context.env, src, line);
                 first = false;
             }
-            dumpWatch(context, w, value);
+            dumpWatch(context.env, w, value);
         }
         return this;
     }

@@ -76,7 +76,7 @@ final class DbgNodeAt extends RootNode {
     @Override
     public SourceSection getSourceSection() {
         CompilerAsserts.neverPartOfCompilation();
-        TruffleLanguage.Env env = lookupContextReference(DbgLanguage.class).get();
+        TruffleLanguage.Env env = lookupContextReference(DbgLanguage.class).get().env;
         TruffleFile truffleFile = env.getPublicTruffleFile(file);
         Source src = null;
         String msg = "";
