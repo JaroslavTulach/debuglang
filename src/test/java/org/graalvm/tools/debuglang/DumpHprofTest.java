@@ -67,8 +67,6 @@ import org.netbeans.lib.profiler.heap.JavaClass;
 import org.netbeans.lib.profiler.heap.ThreadObjectGCRoot;
 
 public class DumpHprofTest {
-    static final String MAGIC_WITH_SEGMENTS = "JAVA PROFILE 1.0.2"; // NOI18N
-
     @Test
     public void singleObject() throws IOException {
         File mydump = File.createTempFile("mydump", ".hprof");
@@ -98,91 +96,20 @@ public class DumpHprofTest {
         assertFalse("It is not daemon", (Boolean)daemon);
     }
 
-    private static int stringCounter = 0;
-    private static int writeString(String text, DataOutputStream os) throws IOException {
-        os.writeByte(0x01);
-        os.writeInt(0); // ms
-        byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
-        os.writeInt(4 + utf8.length);
-        os.writeInt(stringCounter);
-        os.write(utf8);
-        return stringCounter++;
-    }
-
-    private static void writeThreadStarted(int id, String threadName, String groupName, int stackTraceId, DataOutputStream os) throws IOException {
-        int threadNameId = writeString(threadName, os);
-        int groupNameId = writeString(groupName, os);
-
-        os.writeByte(0x0A);
-        os.writeInt(0); // ms
-        os.writeInt(6 * 4);
-        os.writeInt(id); // serial number
-        os.writeInt(id); // object id
-        os.writeInt(stackTraceId); // stacktrace serial number
-        os.writeInt(threadNameId);
-        os.writeInt(groupNameId);
-        os.writeInt(0); // parent group
-    }
-
-    private static void writeStackFrame(int id, String rootName, String sourceFile, int lineNumber, DataOutputStream os) throws IOException {
-        int rootNameId = writeString(rootName, os);
-        int signatureId = 0;
-        int sourceFileId = writeString(sourceFile, os);
-
-        os.writeByte(0x04);
-        os.writeInt(0); // ms
-        os.writeInt(6 * 4);
-        os.writeInt(id);
-        os.writeInt(rootNameId);
-        os.writeInt(signatureId);
-        os.writeInt(sourceFileId);
-        os.writeInt(0);
-        os.writeInt(lineNumber);
-    }
-
-    private static void writeStackTrace(int id, String rootName, String sourceFile, int lineNumber, DataOutputStream os) throws IOException {
-        writeStackFrame(id, rootName, sourceFile, lineNumber, os);
-
-        os.writeByte(0x05);
-        os.writeInt(0); // ms
-        os.writeInt(4 * 4);
-        os.writeInt(id);
-        os.writeInt(id);
-        os.writeInt(1);
-        os.writeInt(id);
-    }
-
-    private static void writeLoadClass(int id, int stackTrace, String className, DataOutputStream os) throws IOException {
-        int classNameId = writeString(className, os);
-
-        os.writeByte(0x02);
-        os.writeInt(0); // ms
-        os.writeInt(4 * 4);
-        os.writeInt(id); // class serial number
-        os.writeInt(id); // class object ID
-        os.writeInt(stackTrace); // stack trace serial number
-        os.writeInt(classNameId); // class name string ID
-    }
 
     private static void generateSingleObject(OutputStream os) throws IOException {
-        DataOutputStream dos = new DataOutputStream(os);
-        dos.write(MAGIC_WITH_SEGMENTS.getBytes());
-        dos.write(0);
-        dos.writeInt(4);
-        dos.writeLong(System.currentTimeMillis());
-        int emptyStringId = writeString("", dos);
-        assert emptyStringId == 0;
-        writeThreadStarted(77, "main", "test", 22, dos);
-        writeStackTrace(22, "HelloWorld", "HelloWorld.js", 11, dos);
-        writeLoadClass(1, 22, "java.lang.String", dos);
-        writeLoadClass(2, 22, "char[]", dos);
-        writeLoadClass(55, 22, "text.HelloWorld", dos);
-        sampleDumpMemory(dos);
-        dos.close();
+        HprofGenerator gen = new HprofGenerator(os);
+        gen.writeThreadStarted(77, "main", "test", 22);
+        gen.writeStackTrace(22, "HelloWorld", "HelloWorld.js", 11);
+        gen.writeLoadClass(1, 22, "java.lang.String");
+        gen.writeLoadClass(2, 22, "char[]");
+        gen.writeLoadClass(55, 22, "text.HelloWorld");
+        sampleDumpMemory(gen);
+        gen.close();
     }
 
     private static ClassBuilder string;
-    private static void sampleDumpMemory(DataOutputStream whole) throws IOException {
+    private static void sampleDumpMemory(HprofGenerator whole) throws IOException {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         DataOutputStream heap = new DataOutputStream(os);
 
@@ -194,7 +121,7 @@ public class DumpHprofTest {
         ClassBuilder charArray = ClassBuilder.newBuilder(2)
                 .dumpClass(whole, heap);
 
-        int mainId = dumpString("main", whole, heap);
+        int mainId = dumpString("main", whole.whole, heap);
         ClassBuilder.newBuilder(55)
             .addField("daemon", Boolean.TYPE)
             .addField("name", String.class)
@@ -205,14 +132,14 @@ public class DumpHprofTest {
         genereateThreadDump(77, 22, heap, mainId, 99);
         heap.close();
 
-        whole.writeByte(0x1c);
-        whole.writeInt(0); // ms
-        whole.writeInt(os.toByteArray().length);
-        whole.write(os.toByteArray());
+        whole.whole.writeByte(0x1c);
+        whole.whole.writeInt(0); // ms
+        whole.whole.writeInt(os.toByteArray().length);
+        whole.whole.write(os.toByteArray());
 
-        whole.writeByte(0x2C);
-        whole.writeInt(0); // ms
-        whole.writeInt(0); // end of message
+        whole.whole.writeByte(0x2C);
+        whole.whole.writeInt(0); // ms
+        whole.whole.writeInt(0); // end of message
     }
 
     private static final class ClassBuilder {
@@ -233,7 +160,7 @@ public class DumpHprofTest {
             return this;
         }
 
-        public ClassBuilder dumpClass(DataOutputStream os, DataOutputStream heap) throws IOException {
+        public ClassBuilder dumpClass(HprofGenerator gen, DataOutputStream heap) throws IOException {
             heap.writeByte(0x20);
             heap.writeInt(classId); // class ID
             heap.writeInt(classId); // stacktrace serial number
@@ -249,7 +176,7 @@ public class DumpHprofTest {
             heap.writeShort(fieldNamesAndTypes.size()); // # of instance fields
             fieldBytes = 0;
             for (Map.Entry<String, Class<?>> entry : fieldNamesAndTypes.entrySet()) {
-                int nId = writeString(entry.getKey(), os);
+                int nId = gen.writeString(entry.getKey());
                 heap.writeInt(nId);
                 if (entry.getValue().isPrimitive()) {
                     if (entry.getValue() == Integer.TYPE) {
@@ -287,6 +214,7 @@ public class DumpHprofTest {
         }
     }
 
+    private static int stringCounter = 10000;
     private static int dumpString(String text, DataOutputStream os, DataOutputStream heap) throws IOException {
         int instanceId = stringCounter++;
 
