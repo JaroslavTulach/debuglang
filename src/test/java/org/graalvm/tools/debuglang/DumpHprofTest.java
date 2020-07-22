@@ -47,9 +47,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,7 @@ import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.HeapFactory;
 import org.netbeans.lib.profiler.heap.Instance;
 import org.netbeans.lib.profiler.heap.JavaClass;
+import org.netbeans.lib.profiler.heap.ThreadObjectGCRoot;
 
 public class DumpHprofTest {
     static final String MAGIC_WITH_SEGMENTS = "JAVA PROFILE 1.0.2"; // NOI18N
@@ -77,9 +80,14 @@ public class DumpHprofTest {
         assertEquals("char[]", allClasses.get(1).getName());
         assertEquals("text.HelloWorld", allClasses.get(2).getName());
 
-        Collection<GCRoot> roots = heap.getGCRoots();
-        assertEquals(1, roots.size());
-        final Instance thread = roots.iterator().next().getInstance();
+        Collection<GCRoot> roots = new ArrayList<>(heap.getGCRoots());
+        assertEquals("Thread & two locals", 3, roots.size());
+        roots.removeIf((t) -> {
+            return ! (t instanceof ThreadObjectGCRoot);
+        });
+        assertEquals("Only one thread", 1, roots.size());
+        final Iterator<GCRoot> it = roots.iterator();
+        final Instance thread = it.next().getInstance();
 
         Object daemon = thread.getValueOfField("daemon");
         assertNotNull("daemon field found", daemon);
@@ -190,10 +198,11 @@ public class DumpHprofTest {
         ClassBuilder.newBuilder(55)
             .addField("daemon", Boolean.TYPE)
             .addField("name", String.class)
+            .addField("priority", int.class)
             .dumpClass(whole, heap)
             .dumpInstance(99, Collections.emptyMap(), heap)
-            .dumpInstance(77, map("daemon", 0, "name", mainId), heap);
-        genereateThreadDump(77, 22, heap);
+            .dumpInstance(77, map("daemon", 0, "name", mainId, "priority", 10), heap);
+        genereateThreadDump(77, 22, heap, mainId, 99);
         heap.close();
 
         whole.writeByte(0x1c);
@@ -303,11 +312,18 @@ public class DumpHprofTest {
         return map;
     }
 
-    private static void genereateThreadDump(int id, int stackTraceId, DataOutputStream os) throws IOException {
+    private static void genereateThreadDump(int id, int stackTraceId, DataOutputStream os, int... locals) throws IOException {
         os.writeByte(0x08);
         os.writeInt(id); // object ID
         os.writeInt(id); // serial #
         os.writeInt(stackTraceId); // stacktrace #
+        
+        for (int objId : locals) {
+            os.writeByte(0x03); // frame GC root
+            os.writeInt(objId);
+            os.writeInt(id); // thread serial #
+            os.writeInt(0); // frame number
+        }
     }
 
 
