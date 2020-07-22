@@ -46,15 +46,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -101,146 +96,36 @@ public class DumpHprofTest {
         HprofGenerator gen = new HprofGenerator(os);
         gen.writeThreadStarted(77, "main", "test", 22);
         gen.writeStackTrace(22, "HelloWorld", "HelloWorld.js", 11);
-        gen.writeLoadClass(1, 22, "java.lang.String");
-        gen.writeLoadClass(2, 22, "char[]");
-        gen.writeLoadClass(55, 22, "text.HelloWorld");
         sampleDumpMemory(gen);
         gen.close();
     }
 
-    private static ClassBuilder string;
     private static void sampleDumpMemory(HprofGenerator whole) throws IOException {
+        whole.writeHeapSegment((seg) -> {
+            int mainId = seg.dumpString("main");
+            
+            HprofGenerator.ClassInstance clazz = seg.newClass("text.HelloWorld")
+                    .addField("daemon", Boolean.TYPE)
+                    .addField("name", String.class)
+                    .addField("priority", int.class)
+                    .dumpClass();
+            
+            int threadOne = seg.dumpInstance(clazz);
+            int threadTwo = seg.dumpInstance(clazz, "daemon", 0, "name", mainId, "priority", 10);
+            generateThreadDump(threadTwo, 22, seg.heap, mainId, threadOne);
+        });
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         DataOutputStream heap = new DataOutputStream(os);
 
-        string = ClassBuilder.newBuilder(1)
-            .addField("value", Object.class)
-            .addField("hash", Integer.TYPE)
-            .dumpClass(whole, heap);
 
-        ClassBuilder charArray = ClassBuilder.newBuilder(2)
-                .dumpClass(whole, heap);
-
-        int mainId = dumpString("main", whole.whole, heap);
-        ClassBuilder.newBuilder(55)
-            .addField("daemon", Boolean.TYPE)
-            .addField("name", String.class)
-            .addField("priority", int.class)
-            .dumpClass(whole, heap)
-            .dumpInstance(99, Collections.emptyMap(), heap)
-            .dumpInstance(77, map("daemon", 0, "name", mainId, "priority", 10), heap);
-        genereateThreadDump(77, 22, heap, mainId, 99);
         heap.close();
-
-        whole.whole.writeByte(0x1c);
-        whole.whole.writeInt(0); // ms
-        whole.whole.writeInt(os.toByteArray().length);
-        whole.whole.write(os.toByteArray());
 
         whole.whole.writeByte(0x2C);
         whole.whole.writeInt(0); // ms
         whole.whole.writeInt(0); // end of message
     }
 
-    private static final class ClassBuilder {
-        private final int classId;
-        private final Map<String,Class<?>> fieldNamesAndTypes = new LinkedHashMap<>();
-        private int fieldBytes;
-
-        private ClassBuilder(int id) {
-            this.classId = id;
-        }
-
-        public static ClassBuilder newBuilder(int id) {
-            return new ClassBuilder(id);
-        }
-
-        public ClassBuilder addField(String name, Class<?> type) {
-            fieldNamesAndTypes.put(name, type);
-            return this;
-        }
-
-        public ClassBuilder dumpClass(HprofGenerator gen, DataOutputStream heap) throws IOException {
-            heap.writeByte(0x20);
-            heap.writeInt(classId); // class ID
-            heap.writeInt(classId); // stacktrace serial number
-            heap.writeInt(0); // superclass ID
-            heap.writeInt(0); // classloader ID
-            heap.writeInt(0); // signers ID
-            heap.writeInt(0); // protection domain ID
-            heap.writeInt(0); // reserved 1
-            heap.writeInt(0); // reserved 2
-            heap.writeInt(0); // instance size
-            heap.writeShort(0); // # of constant pool entries
-            heap.writeShort(0); // # of static fields
-            heap.writeShort(fieldNamesAndTypes.size()); // # of instance fields
-            fieldBytes = 0;
-            for (Map.Entry<String, Class<?>> entry : fieldNamesAndTypes.entrySet()) {
-                int nId = gen.writeString(entry.getKey());
-                heap.writeInt(nId);
-                if (entry.getValue().isPrimitive()) {
-                    if (entry.getValue() == Integer.TYPE) {
-                        heap.writeByte(0x0a); // int
-                        fieldBytes += 4;
-                    } else {
-                        assert entry.getValue() == Boolean.TYPE : "Yet unsupported type: " + entry.getValue();
-                        heap.writeByte(0x04); // boolean
-
-                        fieldBytes++;
-                    }
-                } else {
-                    heap.writeByte(0x02); // object
-                    fieldBytes += 4;
-                }
-            }
-            return this;
-        }
-
-        public ClassBuilder dumpInstance(int instanceId, Map<String,Integer> values, DataOutputStream os) throws IOException {
-            os.writeByte(0x21);
-            os.writeInt(instanceId);
-            os.writeInt(instanceId); // serial number
-            os.writeInt(classId);
-            os.writeInt(fieldBytes);
-            for (Map.Entry<String, Class<?>> entry : fieldNamesAndTypes.entrySet()) {
-                Integer ref = values.get(entry.getKey());
-                if (entry.getValue() == Boolean.TYPE) {
-                    os.writeByte(ref == null ? 0 : ref.intValue());
-                } else {
-                    os.writeInt(ref == null ? 0 : ref.intValue());
-                }
-            }
-            return this;
-        }
-    }
-
-    private static int stringCounter = 10000;
-    private static int dumpString(String text, DataOutputStream os, DataOutputStream heap) throws IOException {
-        int instanceId = stringCounter++;
-
-        heap.writeByte(0x23);
-        heap.writeInt(instanceId);
-        heap.writeInt(instanceId); // serial number
-        heap.writeInt(text.length()); // number of elements
-        heap.writeByte(0x05); // char
-        for (char ch : text.toCharArray()) {
-            heap.writeChar(ch);
-        }
-        int stringId = stringCounter++;
-        string.dumpInstance(stringId, map("value", instanceId, "hash", 0), heap);
-        return stringId;
-    }
-
-    private static Map<String, Integer> map(Object... values) {
-        Map<String,Integer> map = new HashMap<>();
-        for (int i = 0; i < values.length; i += 2) {
-            map.put((String) values[i], (Integer) values[i + 1]);
-
-        }
-        return map;
-    }
-
-    private static void genereateThreadDump(int id, int stackTraceId, DataOutputStream os, int... locals) throws IOException {
+    private static void generateThreadDump(int id, int stackTraceId, DataOutputStream os, int... locals) throws IOException {
         os.writeByte(0x08);
         os.writeInt(id); // object ID
         os.writeInt(id); // serial #
