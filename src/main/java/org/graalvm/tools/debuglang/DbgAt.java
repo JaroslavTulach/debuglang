@@ -138,7 +138,11 @@ final class DbgAt implements TruffleObject {
 
     @ExportMessage
     Object execute(Object[] args, @CachedContext(value = DbgLanguage.class) TruffleLanguage.Env context, @CachedLibrary(limit = "3") InteropLibrary frameLib, @Cached(value = "findSrc(args)", allowUncached = true) String src, @Cached(value = "findLine(args)", allowUncached = true) int line) {
+        if (this.line != line) {
+            return this;
+        }
         Object frame = args[1];
+        boolean first = true;
         for (DbgAtWatch w : actions) {
             Object value;
             try {
@@ -146,14 +150,29 @@ final class DbgAt implements TruffleObject {
             } catch (InteropException ex) {
                 continue;
             }
-            dumpOutLog(context, src, line, w, value);
+            if (first) {
+                dumpPrologue(context, src, line);
+                first = false;
+            }
+            dumpWatch(context, w, value);
         }
         return this;
     }
 
     @CompilerDirectives.TruffleBoundary
-    private void dumpOutLog(TruffleLanguage.Env context, String src, int line1, DbgAtWatch w, Object value) {
-        final String msg = String.format("at %s:%d watch %s = %s\n", src, line1, w.variableName, value);
+    private void dumpPrologue(TruffleLanguage.Env context, String src, int line1) {
+        final String msg = String.format("at %s:%d\n", src, line1);
+        try {
+            final OutputStream out = context.out();
+            out.write(msg.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+    @CompilerDirectives.TruffleBoundary
+    private void dumpWatch(TruffleLanguage.Env context, DbgAtWatch w, Object value) {
+        final String msg = String.format("  watch %s = %s\n", w.variableName, value);
         try {
             final OutputStream out = context.out();
             out.write(msg.getBytes(StandardCharsets.UTF_8));

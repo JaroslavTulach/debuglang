@@ -65,7 +65,7 @@ final class DbgLanguageGrammar {
         return l;
     }
     DbgAt is(@Name("at") KeywordAt at, String file, Colon c, Integer line, List<DbgAtWatch> actions) {
-        return new DbgAt(file, line.intValue(), actions);
+        return new DbgAt(file, line, actions);
     }
     Integer integer(@Match("\\d+") Token t) {
         return Integer.parseInt(t.toString());
