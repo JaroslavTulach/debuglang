@@ -45,10 +45,13 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 final class HprofGenerator implements Closeable {
     private static final String MAGIC_WITH_SEGMENTS = "JAVA PROFILE 1.0.2";
 
+    private final Map<String,Integer> strings = new HashMap<>();
     final DataOutputStream whole;
     private int objectCounter;
 
@@ -61,6 +64,10 @@ final class HprofGenerator implements Closeable {
     }
     
     public int writeString(String text) throws IOException {
+        Integer prevId = strings.get(text);
+        if (prevId != null) {
+            return prevId;
+        }
         int stringId = ++objectCounter;
         whole.writeByte(0x01);
         whole.writeInt(0); // ms
@@ -68,6 +75,8 @@ final class HprofGenerator implements Closeable {
         whole.writeInt(4 + utf8.length);
         whole.writeInt(stringId);
         whole.write(utf8);
+        
+        strings.put(text, stringId);
         return stringId;
     }
     
