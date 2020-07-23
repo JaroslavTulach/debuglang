@@ -47,9 +47,12 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.netbeans.lib.profiler.heap.FieldValue;
 import org.netbeans.lib.profiler.heap.Instance;
+import org.netbeans.lib.profiler.heap.JavaClass;
+import org.netbeans.lib.profiler.heap.PrimitiveArrayInstance;
 
 @ExportLibrary(InteropLibrary.class)
 final class HprofInstance implements TruffleObject {
@@ -62,15 +65,29 @@ final class HprofInstance implements TruffleObject {
 
     @ExportMessage
     boolean hasMembers() {
-        return true;
+        return !isString();
     }
 
     @ExportMessage
-    boolean isNumber() {
+    boolean isString() {
         final String type = instance.getJavaClass().getName();
-        if ("java.lang.String".equals(type)) {
+        return "java.lang.String".equals(type);
+    }
+
+    @ExportMessage
+    String asString() {
+        Object array = instance.getValueOfField("value");
+        return array.toString();
+    }
+
+
+
+    @ExportMessage
+    boolean isNumber() {
+        if (isString()) {
             return false;
         }
+        final String type = instance.getJavaClass().getName();
         return type.startsWith("java.lang.");
     }
 
@@ -125,13 +142,17 @@ final class HprofInstance implements TruffleObject {
 
     @ExportMessage
     Object getMembers(@SuppressWarnings("unused") boolean includeInternal) {
+        return HprofArray.wrap(fieldNames());
+    }
+
+    private List<String> fieldNames() {
         List<FieldValue> arr = instance.getFieldValues();
         List<String> names = new ArrayList<>();
         for (FieldValue f : arr) {
             String name = f.getField().getName();
             names.add(name);
         }
-        return HprofArray.wrap(names);
+        return names;
     }
 
     @ExportMessage
@@ -144,21 +165,55 @@ final class HprofInstance implements TruffleObject {
         return readField(member);
     }
 
-    @ExportMessage
-    boolean hasMetaObject() {
-        return true;
-    }
-
-    @ExportMessage
-    String getMetaObject() {
-        return instance.getJavaClass().getName();
-    }
-
     @CompilerDirectives.TruffleBoundary
     private Object readField(String member) throws UnsupportedMessageException {
-        Instance value = (Instance) this.instance.getValueOfField(member);
-        HprofInstance wrap = new HprofInstance(value);
-        return wrap.isNumber() ? wrap.asInt() : wrap;
+        final Object raw = this.instance.getValueOfField(member);
+        if (raw instanceof Instance) {
+            HprofInstance wrap = new HprofInstance((Instance) raw);
+            return wrap.isNumber() ? wrap.asInt() : wrap;
+        } else {
+            return raw;
+        }
     }
 
+    @Override
+    public String toString() {
+        return toDisplayString(false);
+    }
+
+    @ExportMessage
+    String toDisplayString(boolean allowSideEffects) {
+        if (isString()) {
+            PrimitiveArrayInstance pai = (PrimitiveArrayInstance) instance.getValueOfField("value");
+            int len = pai.getLength();
+            char[] arr = new char[len];
+            for (int i = 0; i < len; i++) {
+                String ith = (String) pai.getValues().get(i);
+                arr[i] = ith.charAt(0);
+            }
+            return new String(arr);
+        }
+        if (isNumber()) {
+            try {
+                return "" + asInt();
+            } catch (UnsupportedMessageException ex) {
+                // go on
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(instance.getJavaClass().getName()).append("[");
+        String sep = "";
+        for (String name : fieldNames()) {
+            sb.append(sep);
+            sb.append(name).append("=");
+            try {
+                sb.append(readField(name));
+            } catch (UnsupportedMessageException ex) {
+                sb.append("?");
+            }
+            sep = ",";
+        }
+        return sb.append("]").toString();
+    }
 }

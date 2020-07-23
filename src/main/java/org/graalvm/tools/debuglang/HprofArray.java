@@ -69,7 +69,7 @@ final class HprofArray implements TruffleObject {
     @SuppressWarnings("unused")
     @ExportMessage
     boolean isArrayElementReadable(long index) {
-        return true;
+        return 0 <= index && index < getArraySize();
     }
 
     @ExportMessage
