@@ -58,7 +58,6 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
-import java.io.IOException;
 
 final class DbgNodeAt extends RootNode {
     @Child
@@ -81,15 +80,15 @@ final class DbgNodeAt extends RootNode {
     @Override
     public SourceSection getSourceSection() {
         CompilerAsserts.neverPartOfCompilation();
-        TruffleLanguage.Env env = lookupContextReference(DbgLanguage.class).get().env;
-        TruffleFile truffleFile = env.getPublicTruffleFile(file);
-        Source src = null;
         String msg = "";
+        Source src = null;
         try {
+            TruffleLanguage.Env env = lookupContextReference(DbgLanguage.class).get().env;
+            TruffleFile truffleFile = env.getPublicTruffleFile(file);
             if (truffleFile != null) {
                 src = Source.newBuilder("dbg", truffleFile).build();
             }
-        } catch (SecurityException | IOException ex) {
+        } catch (Error | Exception ex) {
             msg = ex.getMessage();
         }
         if (src == null) {

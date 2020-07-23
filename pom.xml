@@ -29,9 +29,13 @@
                 <configuration>
                     <artifactSet>
                         <excludes>
-                            <exclude>org.graalvm.*:*</exclude>
+                            <exclude>org.graalvm.sdk:*</exclude>
+                            <exclude>org.graalvm.truffle:*</exclude>
                         </excludes>
                     </artifactSet>
+                    <transformers>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                    </transformers>
                 </configuration>
             </plugin>
         </plugins>

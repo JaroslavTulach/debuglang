@@ -47,6 +47,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.function.Function;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Instrument;
@@ -113,7 +114,17 @@ public class SnapshotTest {
             DebugValue n2 = event.getTopStackFrame().getScope().getDeclaredValue("n2");
             if (n.asInt() == 7) {
                 allN[0] = n.asInt();
-                allN[1] = n1.getProperty("value").asInt();
+                Collection<DebugValue> props = n1.getProperties();
+                assertEquals("Two props", 2, props.size());
+                Iterator<DebugValue> it = props.iterator();
+                for (int i = 0; i < 2; i++) {
+                    DebugValue d = it.next();
+                    if ("value".equals(d.getName())) {
+                        allN[1] = d.asInt();
+                        continue;
+                    }
+                    assertEquals("Only id and value properties", "id", d.getName());
+                }
                 allN[2] = n2.getProperty("value").asInt();
             } else {
                 event.getSession().suspendNextExecution();
