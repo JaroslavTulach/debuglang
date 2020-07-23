@@ -60,20 +60,23 @@ final class HprofDump {
     public HprofDump(OutputStream os) throws IOException {
         this.generator = new HprofGenerator(os);
     }
-    
+
     @CompilerDirectives.TruffleBoundary
     void dumpFrame(String rootName, String src, int line, Object frame) throws IOException {
         generator.writeHeapSegment((seg) -> {
             try {
                 InteropLibrary iop = InteropLibrary.getFactory().getUncached();
                 int frameId = dumpObject(iop, seg, rootName, frame, 3);
+                int threadId = seg.newThread("main#" + frameId)
+                    .addStackFrame(rootName, src, line, frameId)
+                    .dumpThread();
             } catch (InteropException ex) {
                 throw new IOException(rootName + " frame " + frame, ex);
             }
         });
     }
 
-    private int dumpObject(InteropLibrary iop, HprofGenerator.HeapSegment seg, String metaName, Object obj, int depth) 
+    private int dumpObject(InteropLibrary iop, HprofGenerator.HeapSegment seg, String metaName, Object obj, int depth)
     throws UnknownIdentifierException, IOException, UnsupportedMessageException {
         if (depth <= 0) {
             return 0;
@@ -107,7 +110,7 @@ final class HprofDump {
         } catch (InteropException ex) {
             throw new IOException("Object " + obj, ex);
         }
-        
+
         ClassInstance clazz = classes.get(sortedNames);
         if (clazz == null) {
             if (metaName == null) {
@@ -130,5 +133,13 @@ final class HprofDump {
             classes.put(sortedNames, clazz);
         }
         return clazz;
+    }
+
+    void close() {
+        try {
+            generator.close();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 }

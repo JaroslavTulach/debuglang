@@ -74,6 +74,11 @@ final class DbgNodeAt extends RootNode {
     }
 
     @Override
+    public String getName() {
+        return file + ":" + line;
+    }
+
+    @Override
     public SourceSection getSourceSection() {
         CompilerAsserts.neverPartOfCompilation();
         TruffleLanguage.Env env = lookupContextReference(DbgLanguage.class).get().env;

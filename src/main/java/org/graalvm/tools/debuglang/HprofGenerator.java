@@ -59,7 +59,8 @@ final class HprofGenerator implements Closeable {
     private final Map<String,Integer> heapStrings = new HashMap<>();
     private final Map<Class<?>,ClassInstance> primitiveClasses = new HashMap<>();
     private final Map<Object,Integer> primitives = new HashMap<>();
-    final DataOutputStream whole;
+    private final DataOutputStream whole;
+    private final ByteArrayOutputStream rawHeap = new ByteArrayOutputStream();
     private int objectCounter;
     private ClassInstance typeCharArray;
     private ClassInstance typeString;
@@ -77,9 +78,14 @@ final class HprofGenerator implements Closeable {
         void generate(T data) throws IOException;
     }
     
-    public class HeapSegment {
-        private final ByteArrayOutputStream arr = new ByteArrayOutputStream();
-        final DataOutputStream heap = new DataOutputStream(arr);
+    public final class HeapSegment {
+        private final DataOutputStream heap;
+        private final boolean dumpHeapOnClose;
+
+        private HeapSegment(OutputStream out, boolean dumpHeapOnClose) {
+            this.heap = new DataOutputStream(out);
+            this.dumpHeapOnClose = dumpHeapOnClose;
+        }
         
         public ClassBuilder newClass(String name) throws IOException {
             int classId = writeLoadClass(0, name);
@@ -87,16 +93,14 @@ final class HprofGenerator implements Closeable {
         }
 
         public ThreadBuilder newThread(String name) throws IOException {
-            int classId = ++objectCounter;
-            return new ThreadBuilder(classId, name);
+            return new ThreadBuilder(name);
         }
 
         private void close() throws IOException {
-            whole.writeByte(0x1c);
-            whole.writeInt(0); // ms
-            final byte[] bytes = arr.toByteArray();
-            whole.writeInt(bytes.length);
-            whole.write(bytes);
+            heap.close();
+            if (dumpHeapOnClose) {
+                dumpHeap();
+            }
         }
 
         public int dumpString(String text) throws IOException {
@@ -189,11 +193,9 @@ final class HprofGenerator implements Closeable {
             private String groupName;
             private List<Object[]> stacks;
             private final String name;
-            private final int classId;
 
-            private ThreadBuilder(int classId, String name) {
+            private ThreadBuilder(String name) {
                 this.stacks = new ArrayList<>();
-                this.classId = classId;
                 this.name = name;
             }
 
@@ -212,7 +214,7 @@ final class HprofGenerator implements Closeable {
                     typeThread = newClass("java.lang.Thread")
                             .addField("daemon", Boolean.TYPE)
                             .addField("name", String.class)
-                            .addField("priority", int.class)
+                            .addField("priority", Integer.TYPE)
                             .dumpClass();
                 }
                 int nameId = dumpString(name);
@@ -315,7 +317,7 @@ final class HprofGenerator implements Closeable {
     }
     
     public void writeHeapSegment(Generator<HeapSegment> generator) throws IOException {
-        HeapSegment seg = new HeapSegment();
+        HeapSegment seg = new HeapSegment(rawHeap, false); // XXX: true to flush segments frequently
         if (typeString == null) {
             typeString = seg.newClass("java.lang.String")
                     .addField("value", char[].class)
@@ -330,7 +332,19 @@ final class HprofGenerator implements Closeable {
     
     @Override
     public void close() throws IOException {
-        whole.close();
+        dumpHeap();
+    }
+
+    private void dumpHeap() throws IOException {
+        if (rawHeap.size() > 0) {
+            whole.writeByte(0x1c);
+            whole.writeInt(0); // ms
+            final byte[] bytes = rawHeap.toByteArray();
+            whole.writeInt(bytes.length);
+            whole.write(bytes);
+            whole.close();
+            rawHeap.reset();
+        }
     }
 
     // internal primitives
@@ -364,7 +378,7 @@ final class HprofGenerator implements Closeable {
         whole.writeInt(rootNameId);
         whole.writeInt(signatureId);
         whole.writeInt(sourceFileId);
-        whole.writeInt(0);
+        whole.writeInt(0); // class serial #
         whole.writeInt(lineNumber);
         
         return id;
@@ -375,7 +389,7 @@ final class HprofGenerator implements Closeable {
         
         whole.writeByte(0x05);
         whole.writeInt(0); // ms
-        whole.writeInt(4 * 4);
+        whole.writeInt(12 + 4 * frames.length);
         whole.writeInt(id);
         whole.writeInt(threadId);
         whole.writeInt(frames.length);

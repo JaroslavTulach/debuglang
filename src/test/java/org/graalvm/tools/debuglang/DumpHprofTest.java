@@ -40,8 +40,6 @@
  */
 package org.graalvm.tools.debuglang;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -68,17 +66,17 @@ public class DumpHprofTest {
         generateSingleObject(new FileOutputStream(mydump));
         Heap heap = HeapFactory.createHeap(mydump);
         List<JavaClass> allClasses = heap.getAllClasses();
-        assertEquals(4, allClasses.size());
+        assertEquals(5, allClasses.size());
         assertEquals("java.lang.String", allClasses.get(0).getName());
         assertEquals("char[]", allClasses.get(1).getName());
         assertEquals("text.HelloWorld", allClasses.get(2).getName());
 
         Collection<GCRoot> roots = new ArrayList<>(heap.getGCRoots());
-        assertEquals("Thread & two locals", 4, roots.size());
+        assertEquals("Thread & two locals", 5, roots.size());
         roots.removeIf((t) -> {
             return ! (t instanceof ThreadObjectGCRoot);
         });
-        assertEquals("Only one thread", 1, roots.size());
+        assertEquals("Only one thread", 2, roots.size());
         final Iterator<GCRoot> it = roots.iterator();
         final Instance thread = it.next().getInstance();
 
@@ -95,6 +93,7 @@ public class DumpHprofTest {
     private static void generateSingleObject(OutputStream os) throws IOException {
         HprofGenerator gen = new HprofGenerator(os);
         gen.writeHeapSegment(DumpHprofTest::sampleDumpMemory);
+        gen.writeHeapSegment(DumpHprofTest::sampleDumpMemory2);
         gen.close();
     }
 
@@ -110,8 +109,20 @@ public class DumpHprofTest {
         int threadOne = seg.dumpInstance(clazz);
         int threadTwo = seg.dumpInstance(clazz, "daemon", 0, "name", mainId, "priority", 10);
 
-        seg.newThread("main")
-                .addStackFrame("HelloWorld", "HelloWorld.js", 11, mainId, threadOne, threadTwo)
+        int threadId = seg.newThread("main")
+                .addStackFrame("HelloWorld", "HelloWorld.js", 11, mainId, threadOne)
+                .addStackFrame(":program", "HelloWorld.js", 32, threadTwo)
                 .dumpThread();
+
+        seg.dumpPrimitive(threadId);
+    }
+
+    private static void sampleDumpMemory2(HprofGenerator.HeapSegment seg) throws IOException {
+        int threadId = seg.newThread("main2")
+                .addStackFrame("HelloWorld2", "HelloWorld2.js", 23)
+                .addStackFrame(":program2", "HelloWorld2.js", 32)
+                .dumpThread();
+
+        seg.dumpPrimitive(threadId);
     }
 }

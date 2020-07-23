@@ -70,11 +70,22 @@ public class DbgLanguage extends TruffleLanguage<DbgLanguage.Data> {
             }
             return dump;
         }
+
+        void close() {
+            if (dump != null) {
+                dump.close();
+            }
+        }
     }
     
     @Override
     protected Data createContext(Env env) {
         return new Data(env);
+    }
+
+    @Override
+    protected void disposeContext(Data context) {
+        context.close();
     }
 
     @Override

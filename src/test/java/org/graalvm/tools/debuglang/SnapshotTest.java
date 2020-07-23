@@ -41,17 +41,20 @@
 package org.graalvm.tools.debuglang;
 
 import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Collection;
 import java.util.function.Function;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Instrument;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 import org.junit.Test;
+import org.netbeans.lib.profiler.heap.GCRoot;
 import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.HeapFactory;
 
@@ -73,7 +76,7 @@ public class SnapshotTest {
         Value fib = c.eval(fibSource);
         final Instrument insightInstrument = c.getEngine().getInstruments().get("insight");
         assertNotNull("insight instrument found", insightInstrument);
-        Function<Source,Closeable> insight = insightInstrument.lookup(Function.class);
+        Function<Source,AutoCloseable> insight = insightInstrument.lookup(Function.class);
 
         Source debugSource = Source.newBuilder("dbg",
             "at fib.js:5 snapshot", "debug.dbg"
@@ -85,11 +88,16 @@ public class SnapshotTest {
 
         assertEquals(21, twentyOne.asInt());
 
+        c.close();
+
         File hprof = File.createTempFile("mysnaps", ".hprof");
         try (FileOutputStream fos = new FileOutputStream(hprof)) {
             fos.write(os.toByteArray());
         }
         Heap heap = HeapFactory.createHeap(hprof);
         assertNotNull("Heap loaded", heap);
+
+        Collection<GCRoot> roots = heap.getGCRoots();
+        assertFalse("Some roots found: " + roots, roots.isEmpty());
     }
 }
