@@ -378,7 +378,7 @@ final class HprofGenerator implements Closeable {
         whole.writeInt(rootNameId);
         whole.writeInt(signatureId);
         whole.writeInt(sourceFileId);
-        whole.writeInt(0); // class serial #
+        whole.writeInt(++objectCounter); // class serial #
         whole.writeInt(lineNumber);
         
         return id;

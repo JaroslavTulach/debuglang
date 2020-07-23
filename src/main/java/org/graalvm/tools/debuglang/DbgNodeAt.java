@@ -111,7 +111,11 @@ final class DbgNodeAt extends RootNode {
         for (DbgAtWatch w : at.actions) {
             if (w.value != null) {
                 FrameSlot slot = frame.getFrameDescriptor().findFrameSlot(w.variableName);
-                frame.setInt(slot, w.value);
+                if (w.value instanceof Number) {
+                    frame.setInt(slot, ((Number) w.value).intValue());
+                } else {
+                    frame.setObject(slot, w.value);
+                }
             }
         }
     }

@@ -40,6 +40,9 @@
  */
 package org.graalvm.tools.debuglang;
 
+import com.oracle.truffle.api.debug.DebugValue;
+import com.oracle.truffle.api.debug.Debugger;
+import com.oracle.truffle.api.debug.DebuggerSession;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -52,7 +55,6 @@ import org.graalvm.polyglot.Value;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.netbeans.lib.profiler.heap.GCRoot;
 import org.netbeans.lib.profiler.heap.Heap;
@@ -99,5 +101,29 @@ public class SnapshotTest {
 
         Collection<GCRoot> roots = heap.getGCRoots();
         assertFalse("Some roots found: " + roots, roots.isEmpty());
+
+        Source replaySource = Source.newBuilder("dbg", hprof).build();
+
+        Context rectx = Context.newBuilder().allowAllAccess(true).build();
+        final int[] allN = { 0, 0, 0 };
+        Debugger dbg = Debugger.find(rectx.getEngine());
+        DebuggerSession dbgSession = dbg.startSession((event) -> {
+            DebugValue n = event.getTopStackFrame().getScope().getDeclaredValue("n");
+            DebugValue n1 = event.getTopStackFrame().getScope().getDeclaredValue("n1");
+            DebugValue n2 = event.getTopStackFrame().getScope().getDeclaredValue("n2");
+            if (n.asInt() == 7) {
+                allN[0] = n.asInt();
+                allN[1] = n1.getProperty("value").asInt();
+                allN[2] = n2.getProperty("value").asInt();
+            } else {
+                event.getSession().suspendNextExecution();
+            }
+        });
+        dbgSession.suspendNextExecution();
+        rectx.eval(replaySource);
+
+        assertEquals("Replayed OK", 7, allN[0]);
+        assertEquals(21, allN[1] + allN[2]);
+
     }
 }

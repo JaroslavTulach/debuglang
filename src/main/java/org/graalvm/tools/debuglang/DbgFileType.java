@@ -46,11 +46,15 @@ import java.nio.charset.Charset;
 
 public final class DbgFileType implements TruffleFile.FileTypeDetector {
     static final String TYPE = "application/x-debug";
+    static final String HPROF = "application/x-netbeans-profiler-hprof";
 
     @Override
     public String findMimeType(TruffleFile file) throws IOException {
         if (file.getName().endsWith(".dbg")) {
             return TYPE;
+        }
+        if (file.getName().endsWith(".hprof")) {
+            return HPROF;
         }
         return null;
     }

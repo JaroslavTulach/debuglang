@@ -27,7 +27,11 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <shadedGroupFilter>foundation.fluent.api</shadedGroupFilter>
+                    <artifactSet>
+                        <excludes>
+                            <exclude>org.graalvm.*:*</exclude>
+                        </excludes>
+                    </artifactSet>
                 </configuration>
             </plugin>
         </plugins>
@@ -71,7 +75,6 @@
             <groupId>org.netbeans.modules</groupId>
             <artifactId>org-netbeans-lib-profiler</artifactId>
             <version>RELEASE120-1</version>
-            <scope>test</scope>
             <type>jar</type>
         </dependency>
         <dependency>

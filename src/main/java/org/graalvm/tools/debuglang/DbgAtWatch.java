@@ -43,9 +43,9 @@ package org.graalvm.tools.debuglang;
 final class DbgAtWatch {
 
     final String variableName;
-    final Integer value;
+    final Object value;
 
-    public DbgAtWatch(String variableName, Integer value) {
+    public DbgAtWatch(String variableName, Object value) {
         this.variableName = variableName;
         this.value = value;
     }

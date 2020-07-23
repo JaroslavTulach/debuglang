@@ -46,10 +46,13 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.debug.DebuggerTags;
 import com.oracle.truffle.api.instrumentation.ProvidedTags;
 import com.oracle.truffle.api.instrumentation.StandardTags;
+import java.io.File;
 import java.io.IOException;
 
 @TruffleLanguage.Registration(
+    defaultMimeType = DbgFileType.TYPE,
     characterMimeTypes = DbgFileType.TYPE,
+    byteMimeTypes = DbgFileType.HPROF,
     name = "Debug Language",
     id = "dbg",
     fileTypeDetectors = DbgFileType.class
@@ -95,7 +98,13 @@ public class DbgLanguage extends TruffleLanguage<DbgLanguage.Data> {
 
     @Override
     protected CallTarget parse(ParsingRequest request) throws Exception {
-        DbgProgramNode res = new DbgParser(new DbgLanguageGrammar(this)).parseString(request.getSource().getCharacters().toString());
+        final DbgProgramNode res;
+        if (request.getSource().getName().endsWith(".hprof")) {
+            File hprof = new File(request.getSource().getURI());
+            res = HprofParser.parse(this, hprof);
+        } else {
+            res = new DbgParser(new DbgLanguageGrammar(this)).parseString(request.getSource().getCharacters().toString());
+        }
         return Truffle.getRuntime().createCallTarget(res);
     }
 
