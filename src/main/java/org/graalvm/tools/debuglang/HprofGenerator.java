@@ -57,6 +57,8 @@ final class HprofGenerator implements Closeable {
 
     private final Map<String,Integer> wholeStrings = new HashMap<>();
     private final Map<String,Integer> heapStrings = new HashMap<>();
+    private final Map<Class<?>,ClassInstance> primitiveClasses = new HashMap<>();
+    private final Map<Object,Integer> primitives = new HashMap<>();
     final DataOutputStream whole;
     private int objectCounter;
     private ClassInstance typeCharArray;
@@ -122,10 +124,10 @@ final class HprofGenerator implements Closeable {
             return stringId;
         }
 
-        public int dumpInstance(ClassInstance clazz, Object... stringIntSequence) throws IOException {
-            HashMap<String,Integer> values = new HashMap<>();
-            for (int i = 0; i < stringIntSequence.length; i += 2) {
-                values.put((String) stringIntSequence[i], (Integer) stringIntSequence[i + 1]);
+        public int dumpInstance(ClassInstance clazz, Object... stringValueSeq) throws IOException {
+            HashMap<String,Object> values = new HashMap<>();
+            for (int i = 0; i < stringValueSeq.length; i += 2) {
+                values.put((String) stringValueSeq[i], stringValueSeq[i + 1]);
             }
             
             int instanceId = ++objectCounter;
@@ -135,13 +137,51 @@ final class HprofGenerator implements Closeable {
             heap.writeInt(clazz.id);
             heap.writeInt(clazz.fieldBytes);
             for (Map.Entry<String, Class<?>> entry : clazz.fieldNamesAndTypes.entrySet()) {
-                Integer ref = values.get(entry.getKey());
-                if (entry.getValue() == Boolean.TYPE) {
-                    heap.writeByte(ref == null ? 0 : ref.intValue());
+                final Class<?> type = entry.getValue();
+                final Object ref = values.get(entry.getKey());
+                if (type == Boolean.TYPE || type == Byte.TYPE) {
+                    heap.writeByte(ref == null ? 0 : ((Number)ref).byteValue());
+                } else if (entry.getValue() == Short.TYPE) {
+                    heap.writeShort(ref == null ? 0 : ((Number)ref).shortValue());
+                } else if (entry.getValue() == Long.TYPE) {
+                    heap.writeLong(ref == null ? 0 : ((Number)ref).longValue());
+                } else if (entry.getValue() == Float.TYPE) {
+                    heap.writeFloat(ref == null ? 0 : ((Number)ref).floatValue());
+                } else if (entry.getValue() == Double.TYPE) {
+                    heap.writeDouble(ref == null ? 0 : ((Number)ref).doubleValue());
+                } else if (entry.getValue() == Character.TYPE) {
+                    heap.writeChar(ref == null ? 0 : ((Character)ref).charValue());
                 } else {
-                    heap.writeInt(ref == null ? 0 : ref.intValue());
+                    heap.writeInt(ref == null ? 0 : ((Number)ref).intValue());
                 }
             }
+            return instanceId;
+        }
+
+        public int dumpPrimitive(Object obj) throws IOException {
+            Integer id = primitives.get(obj);
+            if (id != null) {
+                return id;
+            }
+            
+            final Class<? extends Object> clazz = obj.getClass();
+            ClassInstance wrapperClass = primitiveClasses.get(clazz);
+            if (wrapperClass == null) {
+                try {
+                    assert clazz.getName().startsWith("java.lang.");
+                    Class<?> primitiveType = clazz.getDeclaredField("value").getType();
+                    assert primitiveType.isPrimitive();
+
+                    wrapperClass = newClass(clazz.getName())
+                            .addField("value", primitiveType)
+                            .dumpClass();
+                    primitiveClasses.put(clazz, wrapperClass);
+                } catch (ReflectiveOperationException ex) {
+                    throw new IOException("Processing " + obj, ex);
+                }
+            }
+            int instanceId = dumpInstance(wrapperClass, "value", obj);
+            primitives.put(obj, instanceId);
             return instanceId;
         }
 

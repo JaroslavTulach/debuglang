@@ -63,8 +63,8 @@ public class SnapshotTest {
         Source fibSource = Source.newBuilder("js",
                 "(function fib(n) {\n"
                 + "  if (n < 2) return 1;\n"
-                + "  let n1 = { value : fib(n - 1) };\n"
-                + "  let n2 = { value : fib(n - 2) };\n"
+                + "  let n1 = { value : fib(n - 1), id : 'n1' };\n"
+                + "  let n2 = { value : fib(n - 2), id : 'n2' };\n"
                 + "  return n1.value + n2.value;\n"
                 + "})\n",
                 "fib.js"

@@ -78,8 +78,11 @@ final class HprofDump {
         if (depth <= 0) {
             return 0;
         }
+        if (obj instanceof String) {
+            return seg.dumpString((String) obj);
+        }
         if (!(obj instanceof TruffleObject)) {
-            return 0;
+            return seg.dumpPrimitive(obj);
         }
         TreeSet<String> sortedNames = new TreeSet<>();
         ClassInstance clazz = findClass(iop, seg, metaName, sortedNames, obj);
