@@ -66,14 +66,14 @@ final class HprofDump {
         generator.writeHeapSegment((seg) -> {
             try {
                 InteropLibrary iop = InteropLibrary.getFactory().getUncached();
-                int frameId = dumpObject(iop, seg, frame, 3);
+                int frameId = dumpObject(iop, seg, rootName, frame, 3);
             } catch (InteropException ex) {
-                throw new IOException("Frame " + frame, ex);
+                throw new IOException(rootName + " frame " + frame, ex);
             }
         });
     }
 
-    private int dumpObject(InteropLibrary iop, HprofGenerator.HeapSegment seg, Object obj, int depth) 
+    private int dumpObject(InteropLibrary iop, HprofGenerator.HeapSegment seg, String metaName, Object obj, int depth) 
     throws UnknownIdentifierException, IOException, UnsupportedMessageException {
         if (depth <= 0) {
             return 0;
@@ -82,19 +82,19 @@ final class HprofDump {
             return 0;
         }
         TreeSet<String> sortedNames = new TreeSet<>();
-        ClassInstance clazz = findClass(iop, seg, sortedNames, obj);
+        ClassInstance clazz = findClass(iop, seg, metaName, sortedNames, obj);
         Object[] values = new Object[sortedNames.size() * 2];
         int cnt = 0;
         for (String n : sortedNames) {
             values[cnt] = n;
             final Object v = iop.readMember(obj, n);
-            values[cnt + 1] = dumpObject(iop, seg, v, depth - 1);
+            values[cnt + 1] = dumpObject(iop, seg, null, v, depth - 1);
             cnt += 2;
         }
         return seg.dumpInstance(clazz, values);
     }
 
-    ClassInstance findClass(InteropLibrary iop, HprofGenerator.HeapSegment seg, TreeSet<String> sortedNames, Object obj) throws IOException {
+    ClassInstance findClass(InteropLibrary iop, HprofGenerator.HeapSegment seg, String metaName, TreeSet<String> sortedNames, Object obj) throws IOException {
         try {
             Object names = iop.getMembers(obj);
             long len = iop.getArraySize(names);
@@ -107,12 +107,13 @@ final class HprofDump {
         
         ClassInstance clazz = classes.get(sortedNames);
         if (clazz == null) {
-            String metaName = null;
-            try {
-                Object meta = iop.getMetaObject(obj);
-                metaName = iop.asString(iop.getMetaQualifiedName(meta));
-            } catch (UnsupportedMessageException unsupportedMessageException) {
-                metaName = "Frame";
+            if (metaName == null) {
+                try {
+                    Object meta = iop.getMetaObject(obj);
+                    metaName = iop.asString(iop.getMetaQualifiedName(meta));
+                } catch (UnsupportedMessageException unsupportedMessageException) {
+                    metaName = "Frame";
+                }
             }
             StringBuilder fullName = new StringBuilder(metaName);
             for (String n : sortedNames) {
