@@ -62,7 +62,6 @@ final class HprofGenerator implements Closeable {
     private final DataOutputStream whole;
     private final ByteArrayOutputStream rawHeap = new ByteArrayOutputStream();
     private int objectCounter;
-    private ClassInstance typeCharArray;
     private ClassInstance typeString;
     private ClassInstance typeThread;
 
@@ -89,7 +88,7 @@ final class HprofGenerator implements Closeable {
         
         public ClassBuilder newClass(String name) throws IOException {
             int classId = writeLoadClass(0, name);
-            return new ClassBuilder(classId, name);
+            return new ClassBuilder(classId);
         }
 
         public ThreadBuilder newThread(String name) throws IOException {
@@ -154,7 +153,7 @@ final class HprofGenerator implements Closeable {
                 } else if (entry.getValue() == Double.TYPE) {
                     heap.writeDouble(ref == null ? 0 : ((Number)ref).doubleValue());
                 } else if (entry.getValue() == Character.TYPE) {
-                    heap.writeChar(ref == null ? 0 : ((Character)ref).charValue());
+                    heap.writeChar(ref == null ? 0 : ((Character)ref));
                 } else {
                     heap.writeInt(ref == null ? 0 : ((Number)ref).intValue());
                 }
@@ -191,7 +190,7 @@ final class HprofGenerator implements Closeable {
 
         public final class ThreadBuilder {
             private String groupName;
-            private List<Object[]> stacks;
+            private final List<Object[]> stacks;
             private final String name;
 
             private ThreadBuilder(String name) {
@@ -251,12 +250,10 @@ final class HprofGenerator implements Closeable {
         
         public final class ClassBuilder {
             private final int classId;
-            private final String className;
             private TreeMap<String, Class<?>> fieldNamesAndTypes = new TreeMap<>();
 
-            private ClassBuilder(int id, String name) {
+            private ClassBuilder(int id) {
                 this.classId = id;
-                this.className = name;
             }
 
             public ClassBuilder addField(String name, Class<?> type) {
@@ -297,7 +294,7 @@ final class HprofGenerator implements Closeable {
                         fieldBytes += 4;
                     }
                 }
-                ClassInstance inst = new ClassInstance(classId, className, fieldNamesAndTypes, fieldBytes);
+                ClassInstance inst = new ClassInstance(classId, fieldNamesAndTypes, fieldBytes);
                 fieldNamesAndTypes = new TreeMap<>();
                 return inst;
             }
@@ -309,7 +306,7 @@ final class HprofGenerator implements Closeable {
         private final TreeMap<String, Class<?>> fieldNamesAndTypes;
         private final int fieldBytes;
 
-        private ClassInstance(int id, String className, TreeMap<String, Class<?>> fieldNamesAndTypes, int fieldBytes) {
+        private ClassInstance(int id, TreeMap<String, Class<?>> fieldNamesAndTypes, int fieldBytes) {
             this.id = id;
             this.fieldNamesAndTypes = fieldNamesAndTypes;
             this.fieldBytes = fieldBytes;
@@ -323,7 +320,7 @@ final class HprofGenerator implements Closeable {
                     .addField("value", char[].class)
                     .addField("hash", Integer.TYPE)
                     .dumpClass();
-            typeCharArray = seg.newClass("char[]")
+            seg.newClass("char[]")
                     .dumpClass();
         }
         generator.generate(seg);

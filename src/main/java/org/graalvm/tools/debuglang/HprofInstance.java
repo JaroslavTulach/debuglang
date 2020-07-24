@@ -47,11 +47,9 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.netbeans.lib.profiler.heap.FieldValue;
 import org.netbeans.lib.profiler.heap.Instance;
-import org.netbeans.lib.profiler.heap.JavaClass;
 import org.netbeans.lib.profiler.heap.PrimitiveArrayInstance;
 
 @ExportLibrary(InteropLibrary.class)
@@ -148,10 +146,9 @@ final class HprofInstance implements TruffleObject {
     private List<String> fieldNames() {
         List<FieldValue> arr = instance.getFieldValues();
         List<String> names = new ArrayList<>();
-        for (FieldValue f : arr) {
-            String name = f.getField().getName();
+        arr.stream().map(f -> f.getField().getName()).forEachOrdered(name -> {
             names.add(name);
-        }
+        });
         return names;
     }
 
