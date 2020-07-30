@@ -107,6 +107,8 @@ final class HprofDump {
             for (long i = 0; i < len; i++) {
                 sortedNames.add(iop.readArrayElement(names, i).toString());
             }
+        } catch (UnsupportedMessageException ex) {
+            // no names
         } catch (InteropException ex) {
             throw new IOException("Object " + obj, ex);
         }
