@@ -69,7 +69,7 @@ public class DbgLanguage extends TruffleLanguage<DbgLanguage.Data> {
 
         HprofDump getHprof() throws IOException {
             if (dump == null) {
-                dump = new HprofDump(env.out());
+                dump = new HprofDump(env.err());
             }
             return dump;
         }
