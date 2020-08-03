@@ -74,7 +74,7 @@ final class HprofParser {
                     for (Object o : f.getInstance().getFieldValues()) {
                         FieldValue fieldValue = (FieldValue) o;
                         Instance value = (Instance) f.getInstance().getValueOfField(fieldValue.getField().getName());
-                        copy.add(new DbgAtWatch(fieldValue.getField().getName(), new HprofInstance(value)));
+                        copy.add(new DbgAtWatch(fieldValue.getField().getName(), new HprofInstance(value), 0));
                     }
                 }
                 statements.add(new DbgAt(file, line, copy));

@@ -162,7 +162,7 @@ final class DbgAt implements TruffleObject {
         for (DbgAtWatch w : actions) {
             if (w.variableName == null) {
                 try {
-                    context.getHprof().dumpFrame(rootName, src, line, frame);
+                    context.getHprof().dumpFrame(rootName, src, line, frame, w.depth);
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }

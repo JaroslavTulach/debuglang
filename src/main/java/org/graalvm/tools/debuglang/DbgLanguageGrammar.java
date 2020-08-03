@@ -85,17 +85,21 @@ final class DbgLanguageGrammar {
     }
 
     List<DbgAtWatch> snapshot(@Name("snapshot") KeywordSnapshot snapshot) {
+        return snapshot(snapshot, null, 3);
+    }
+
+    List<DbgAtWatch> snapshot(@Name("snapshot") KeywordSnapshot snapshot, @Name("depth") KeywordDepth depth, Integer depthSize) {
         final LinkedList<DbgAtWatch> l = new LinkedList<>();
-        l.addFirst(new DbgAtWatch(null, null));
+        l.addFirst(new DbgAtWatch(null, null, depthSize));
         return l;
     }
 
     DbgAtWatch is(@Name("watch") KeywordWatch watch, String variableName, Equals equals, Integer value) {
-        return new DbgAtWatch(variableName, value);
+        return new DbgAtWatch(variableName, value, 0);
     }
 
     DbgAtWatch is(@Name("watch") KeywordWatch watch, String variableName) {
-        return new DbgAtWatch(variableName, null);
+        return new DbgAtWatch(variableName, null, 0);
     }
 
     static void ignore(@Match("\\s+") WhiteSpace w) {}
@@ -106,6 +110,10 @@ final class DbgLanguageGrammar {
 
     static final class KeywordWatch {
         KeywordWatch(String k) {}
+    }
+
+    static final class KeywordDepth {
+        KeywordDepth(String k) {}
     }
 
     static final class KeywordSnapshot {

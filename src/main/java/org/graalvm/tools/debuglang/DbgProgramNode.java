@@ -91,7 +91,9 @@ final class DbgProgramNode extends RootNode {
             if (target == null) {
                 FrameDescriptor fd = new FrameDescriptor();
                 for (DbgAtWatch w : at.actions) {
-                    fd.addFrameSlot(w.variableName);
+                    if (w.variableName != null) {
+                        fd.addFrameSlot(w.variableName);
+                    }
                 }
                 DbgNodeAt atNode = new DbgNodeAt(lang, fd, at.file, at.line);
                 target = Truffle.getRuntime().createCallTarget(atNode);

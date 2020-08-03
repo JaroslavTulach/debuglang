@@ -83,4 +83,24 @@ public class DbgLanguageTest {
         Assert.assertEquals(0, res.asInt());
     }
 
+    @Test
+    public void parseSnapshot() {
+        final Context ctx = Context.newBuilder().build();
+        Value res = ctx.eval("dbg", ""
+                + "at fib2.js:8\n"
+                + "  snapshot\n"
+        );
+        Assert.assertEquals(0, res.asInt());
+    }
+
+    @Test
+    public void parseSnapshotDepth() {
+        final Context ctx = Context.newBuilder().build();
+        Value res = ctx.eval("dbg", ""
+                + "at fib2.js:8\n"
+                + "  snapshot depth 7\n"
+        );
+        Assert.assertEquals(0, res.asInt());
+    }
+
 }

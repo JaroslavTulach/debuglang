@@ -56,17 +56,22 @@ import org.graalvm.tools.debuglang.HprofGenerator.ClassInstance;
 final class HprofDump {
     private final HprofGenerator generator;
     private final Map<TreeSet<String>,ClassInstance> classes = new HashMap<>();
+    private Integer tooDeepReference;
 
     public HprofDump(OutputStream os) throws IOException {
         this.generator = new HprofGenerator(os);
     }
 
     @CompilerDirectives.TruffleBoundary
-    void dumpFrame(String rootName, String src, int line, Object frame) throws IOException {
+    void dumpFrame(String rootName, String src, int line, Object frame, int depth) throws IOException {
         generator.writeHeapSegment((seg) -> {
+            if (tooDeepReference == null) {
+                ClassInstance unavailable = seg.newClass("Unavailable").dumpClass();
+                tooDeepReference = seg.dumpInstance(unavailable);
+            }
             try {
                 InteropLibrary iop = InteropLibrary.getFactory().getUncached();
-                int frameId = dumpObject(iop, seg, rootName, frame, 3);
+                int frameId = dumpObject(iop, seg, rootName, frame, depth);
                 int threadId = seg.newThread("main#" + frameId)
                     .addStackFrame(rootName, src, line, frameId)
                     .dumpThread();
@@ -79,7 +84,7 @@ final class HprofDump {
     private int dumpObject(InteropLibrary iop, HprofGenerator.HeapSegment seg, String metaName, Object obj, int depth)
     throws UnknownIdentifierException, IOException, UnsupportedMessageException {
         if (depth <= 0) {
-            return 0;
+            return tooDeepReference;
         }
         if (obj instanceof String) {
             return seg.dumpString((String) obj);

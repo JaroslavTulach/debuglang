@@ -44,10 +44,12 @@ final class DbgAtWatch {
 
     final String variableName;
     final Object value;
+    final int depth;
 
-    public DbgAtWatch(String variableName, Object value) {
+    public DbgAtWatch(String variableName, Object value, int depth) {
         this.variableName = variableName;
         this.value = value;
+        this.depth = depth;
     }
 
 }
