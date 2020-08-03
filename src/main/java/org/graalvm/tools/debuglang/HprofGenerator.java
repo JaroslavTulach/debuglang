@@ -279,15 +279,34 @@ final class HprofGenerator implements Closeable {
                 for (Map.Entry<String, Class<?>> entry : fieldNamesAndTypes.entrySet()) {
                     int nId = writeString(entry.getKey());
                     heap.writeInt(nId);
-                    if (entry.getValue().isPrimitive()) {
-                        if (entry.getValue() == Integer.TYPE) {
-                            heap.writeByte(0x0a); // int
-                            fieldBytes += 4;
-                        } else {
-                            assert entry.getValue() == Boolean.TYPE : "Yet unsupported type: " + entry.getValue();
-                            heap.writeByte(0x04); // boolean
-
+                    final Class<?> type = entry.getValue();
+                    if (type.isPrimitive()) {
+                        if (type == Boolean.TYPE) {
+                            heap.writeByte(0x04);
                             fieldBytes++;
+                        } else if (type == Character.TYPE) {
+                            heap.writeByte(0x05);
+                            fieldBytes += 2;
+                        } else if (type == Float.TYPE) {
+                            heap.writeByte(0x06);
+                            fieldBytes += 4;
+                        } else if (type == Double.TYPE) {
+                            heap.writeByte(0x07);
+                            fieldBytes += 8;
+                        } else if (type == Byte.TYPE) {
+                            heap.writeByte(0x08);
+                            fieldBytes++;
+                        } else if (type == Short.TYPE) {
+                            heap.writeByte(0x09);
+                            fieldBytes += 2;
+                        } else if (type == Integer.TYPE) {
+                            heap.writeByte(0x0a);
+                            fieldBytes += 4;
+                        } else if (type == Long.TYPE) {
+                            heap.writeByte(0x0b);
+                            fieldBytes += 8;
+                        } else {
+                            throw new IllegalStateException("Unsupported primitive type: " + type);
                         }
                     } else {
                         heap.writeByte(0x02); // object

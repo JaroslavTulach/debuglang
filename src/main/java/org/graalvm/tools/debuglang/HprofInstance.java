@@ -169,7 +169,7 @@ final class HprofInstance implements TruffleObject {
             HprofInstance wrap = new HprofInstance((Instance) raw);
             return wrap.isNumber() ? wrap.asInt() : wrap;
         } else {
-            return raw;
+            return NullObject.nullCheck(raw);
         }
     }
 

@@ -46,6 +46,7 @@ import com.oracle.truffle.api.debug.DebuggerSession;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.function.Function;
@@ -56,6 +57,7 @@ import org.graalvm.polyglot.Value;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.netbeans.lib.profiler.heap.GCRoot;
 import org.netbeans.lib.profiler.heap.Heap;
@@ -135,6 +137,81 @@ public class SnapshotTest {
 
         assertEquals("Replayed OK", 7, allN[0]);
         assertEquals(21, allN[1] + allN[2]);
+
+    }
+
+
+    @Test
+    public void processSieve() throws Exception {
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        Context c = Context.newBuilder().allowAllAccess(true).out(os).err(os).build();
+
+        URL sieveUrl = SnapshotTest.class.getResource("sieve.js");
+        assertNotNull("sieve.js found", sieveUrl);
+
+        Source sieveSource = Source.newBuilder("js", sieveUrl).build();
+
+        c.eval(sieveSource);
+        final Instrument insightInstrument = c.getEngine().getInstruments().get("insight");
+        assertNotNull("insight instrument found", insightInstrument);
+        Function<Source,AutoCloseable> insight = insightInstrument.lookup(Function.class);
+
+        Source debugSource = Source.newBuilder("dbg",
+            "at fib.js:69 snapshot", "debug.dbg"
+        ).buildLiteral();
+
+        insight.apply(debugSource);
+
+        Value measure = c.getBindings("js").getMember("measure");
+        assertTrue("Function found", measure.canExecute());
+        Value hundredPrime = measure.execute(100);
+
+        assertEquals(541, hundredPrime.asInt());
+
+        c.close();
+
+        File hprof = File.createTempFile("mysnaps", ".hprof");
+        try (FileOutputStream fos = new FileOutputStream(hprof)) {
+            fos.write(os.toByteArray());
+        }
+        Heap heap = HeapFactory.createHeap(hprof);
+        assertNotNull("Heap loaded", heap);
+
+        Collection<GCRoot> roots = heap.getGCRoots();
+        assertFalse("Some roots found: " + roots, roots.isEmpty());
+
+        Source replaySource = Source.newBuilder("dbg", hprof).build();
+
+        Context rectx = Context.newBuilder().allowAllAccess(true).build();
+        final int[] allN = { 0, 0, 0, 0 };
+        Debugger dbg = Debugger.find(rectx.getEngine());
+        DebuggerSession dbgSession = dbg.startSession((event) -> {
+            DebugValue n = event.getTopStackFrame().getScope().getDeclaredValue("n");
+            if (++allN[3] == 97) {
+                double sqrt = event.getTopStackFrame().getScope().getDeclaredValue("sqrt").asDouble();
+                assertEquals("Almost ten", 9.7, 0.3, sqrt);
+
+                allN[0] = allN[3];
+
+                DebugValue thiz = event.getTopStackFrame().getScope().getDeclaredValue("this");
+                allN[1] = thiz.getProperty("number").asInt();
+                DebugValue newFilter = event.getTopStackFrame().getScope().getDeclaredValue("newFilter");
+                assertFalse(newFilter.isNull());
+                allN[2] = newFilter.getProperty("number").asInt();
+                DebugValue next2 = newFilter.getProperty("next");
+                assertNotNull(next2);
+                assertFalse(next2.isNull());
+                assertTrue(next2.getProperty("next").isNull());
+            } else {
+                event.getSession().suspendNextExecution();
+            }
+        });
+        dbgSession.suspendNextExecution();
+        rectx.eval(replaySource);
+
+        assertEquals("1st prime number...", 2, allN[1]);
+        assertEquals("97th primer number ...", 97, allN[0]);
+        assertEquals("...is 521", 521, allN[2]);
 
     }
 }
