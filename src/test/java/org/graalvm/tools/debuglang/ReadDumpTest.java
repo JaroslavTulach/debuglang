@@ -41,27 +41,17 @@
 package org.graalvm.tools.debuglang;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Test;
-import org.netbeans.lib.profiler.heap.GCRoot;
 import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.HeapFactory;
-import org.netbeans.lib.profiler.heap.Instance;
 import org.netbeans.lib.profiler.heap.JavaClass;
-import org.netbeans.lib.profiler.heap.ThreadObjectGCRoot;
 
 public class ReadDumpTest {
     @Test
@@ -72,7 +62,7 @@ public class ReadDumpTest {
         
         Heap heap0 = HeapFactory.createHeap(mydump, 0);
         List<JavaClass> allClasses0 = heap0.getAllClasses();
-        assertEquals(10, allClasses0.size());
+        assertEquals(11, allClasses0.size());
 
         Heap heap1 = HeapFactory.createHeap(mydump, 1);
         List<JavaClass> allClasses1 = heap1.getAllClasses();
